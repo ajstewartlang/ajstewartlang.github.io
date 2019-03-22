@@ -1,3 +1,3 @@
 # ajstewartlang.github.io
 
-ajstewartlang.github.io/mixed_models
+[Mixed_models] (ajstewartlang.github.io/mixed_models)
