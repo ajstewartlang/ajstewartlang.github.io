@@ -1,1 +1,40 @@
-var kOrientationChangedEvent="OrientationController:OrientationChangedEvent";var OrientationController=Class.create({initialize:function(){if(gDevice==kDeviceMobile){Event.observe(window,"orientationchange",this.handleDeviceOrientationChangeEvent.bind(this));this.handleDeviceOrientationChangeEvent()}this.orientation=kOrientationUnknown},handleDeviceOrientationChangeEvent:function(b){var c=window.orientation;var a=kOrientationUnknown;if((c===0)||(c===180)){a=kOrientationPortrait}else{a=kOrientationLandscape}this.changeOrientation(a)},changeOrientation:function(a){this.orientation=a;document.fire(kOrientationChangedEvent,{orientation:this.orientation})}});
+/*
+ * OrientationController.js
+ * Keynote HTML Player
+ * 
+ * Responsibility: Tungwei Cheng
+ * Copyright (c) 2009-2013 Apple Inc. All rights reserved.
+ */
+
+var kOrientationChangedEvent = "OrientationController:OrientationChangedEvent";
+
+var OrientationController = Class.create({
+    initialize: function() {
+        if (gDevice == kDeviceMobile) {
+            Event.observe(window, "orientationchange", this.handleDeviceOrientationChangeEvent.bind(this));
+            this.handleDeviceOrientationChangeEvent();
+        }
+
+        this.orientation = kOrientationUnknown;
+    },
+
+    handleDeviceOrientationChangeEvent: function(event) {
+        var orientationInDegrees = window.orientation;
+        var newOrientation = kOrientationUnknown;
+
+        if ((orientationInDegrees === 0) || (orientationInDegrees === 180)) {
+            newOrientation = kOrientationPortrait;
+        } else {
+            newOrientation = kOrientationLandscape;
+        }
+        this.changeOrientation(newOrientation);
+    },
+
+    changeOrientation: function(newOrientation) {
+        this.orientation = newOrientation;
+
+        document.fire(kOrientationChangedEvent, {
+            orientation: this.orientation
+        });
+    }
+});
