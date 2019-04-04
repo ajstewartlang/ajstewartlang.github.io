@@ -1,1 +1,4274 @@
-var kShaderUniformGravity="Gravity";var kShaderUniformMaskTexture="MaskTexture";var kShaderUniformNoiseAmount="NoiseAmount";var kShaderUniformNoiseMax="NoiseMax";var kShaderUniformNoiseSeed="NoiseSeed";var kShaderUniformParticleBurstTiming="ParticleBurstTiming";var kShaderUniformPreviousParticleBurstTiming="PreviousParticleBurstTiming";var kShaderUniformPreviousPercent="PreviousPercent";var kShaderUniformShouldSparkle="ShouldSparkle";var kShaderUniformSparklePeriod="SparklePeriod";var kShaderUniformSparkleStartTime="SparkleStartTime";var kShaderUniformStartScale="StartScale";var KNWebGLRenderer=Class.create({initialize:function(c){var a=this.canvas=c.canvas;this.canvasId=c.canvasId;this.textureAssets=c.textureAssets;this.durationMax=c.overallEndTime*1000;this.glPrograms=[];this.elapsed=0;var b=this.gl=a.getContext("webgl")||a.getContext("experimental-webgl");if(!b){this.noGL=true;return}this.animationStarted=false;b.viewportWidth=a.width;b.viewportHeight=a.height;this.initMVPMatrix()},initMVPMatrix:function(){var i=this.gl;var a=i.viewportWidth;var e=i.viewportHeight;var c=20*(Math.PI/180);var b=e/(2*Math.tan(c/2));var d=b-(a*1.5);var f=b+(a*15);this.slideProjectionMatrix=WebGraphics.makePerspectiveMatrix4(20,a/e,Math.max(1,d),f);var g=WebGraphics.translateMatrix4(WebGraphics.createMatrix4(),-a/2,-e/2,-b);this.slideProjectionMatrix=WebGraphics.multiplyMatrix4(this.slideProjectionMatrix,g);this.slideOrthoMatrix=WebGraphics.makeOrthoMatrix4(0,a,0,e,-1,1)},setupTexture:function(c){var a=[];this.textureInfoFromEffect(c.kpfLayer,{pointX:0,pointY:0},a);for(var b=0,d=a.length;b<d;b++){var f=a[b].textureId;var e=this.textureAssets[f];a[b].texture=KNWebGLUtil.createTexture(this.gl,e)}return a},textureInfoFromEffect:function(f,e,a){var d={};d.offset={pointX:e.pointX+f.bounds.offset.pointX,pointY:e.pointY+f.bounds.offset.pointY};if(f.textureId){d.textureId=f.textureId;d.width=f.bounds.width;d.height=f.bounds.height;d.initialState=f.initialState;d.animations=f.animations;d.hasHighlightedBulletAnimation=f.hasHighlightedBulletAnimation;d.textureRect={origin:{x:d.offset.pointX,y:d.offset.pointY},size:{width:d.width,height:d.height}};a.push(d)}else{for(var b=0,c=f.layers.length;b<c;b++){this.textureInfoFromEffect(f.layers[b],d.offset,a)}}},draw:function(c){var d={effect:c,textures:this.setupTexture(c)};var b=c.type;var a;if(b==="transition"){switch(c.name){case"apple:wipe-iris":a=new KNWebGLTransitionIris(this,d);break;case"com.apple.iWork.Keynote.BUKTwist":a=new KNWebGLTransitionTwist(this,d);break;case"com.apple.iWork.Keynote.KLNColorPlanes":a=new KNWebGLTransitionColorPlanes(this,d);break;case"com.apple.iWork.Keynote.BUKFlop":a=new KNWebGLTransitionFlop(this,d);break;case"com.apple.iWork.Keynote.KLNConfetti":a=new KNWebGLTransitionConfetti(this,d);break;default:a=new KNWebGLDissolve(this,d);break}}else{if(b==="buildIn"||b==="buildOut"){switch(c.name){case"apple:wipe-iris":a=new KNWebGLBuildIris(this,d);break;case"com.apple.iWork.Keynote.BUKAnvil":a=new KNWebGLBuildAnvil(this,d);break;case"com.apple.iWork.Keynote.KLNFlame":a=new KNWebGLBuildFlame(this,d);break;case"com.apple.iWork.Keynote.KNFireworks":a=new KNWebGLBuildFireworks(this,d);break;case"com.apple.iWork.Keynote.KLNConfetti":a=new KNWebGLBuildConfetti(this,d);break;case"com.apple.iWork.Keynote.KLNDiffuse":a=new KNWebGLBuildDiffuse(this,d);break;default:a=new KNWebGLDissolve(this,d);break}}else{if(b==="smartBuild"){switch(c.name){case"apple:gallery-dissolve":a=new KNWebGLContents(this,d);break;default:a=new KNWebGLDissolve(this,d);break}}}}this.removeProgram(c.objectID);this.glPrograms.push(a)},animate:function(){var f=new Date();var h=0;if(this.time){var b=f.getTime();h=b-this.time;this.time=b}else{h=0;this.time=f.getTime()}this.elapsed+=h;var e=this.glPrograms;var d=e.length;if(this.elapsed<=this.durationMax){this.animationRequest=window.requestAnimFrame(this.animate.bind(this))}else{for(var c=0;c<d;c++){var a=e[c];a.isCompleted=true}}var g=this.gl;g.clearColor(0,0,0,0);g.clear(g.COLOR_BUFFER_BIT|g.DEPTH_BUFFER_BIT);for(var c=0;c<d;c++){var a=e[c];a.drawFrame(h,this.elapsed,a.duration)}},removeProgram:function(d){var b=this.glPrograms;var a=b.length;while(a--){var c=b[a];if(c.effect.objectID===d){b.splice(a,1)}}},resize:function(a){var d=this.gl;var b=a.width;var c=a.height;if(d.viewportWidth!==b||d.viewportHeight!==c){d.viewport(0,0,b,c);d.viewportWidth=b;d.viewportHeight=c}}});var KNWebGLProgram=Class.create({initialize:function(d,a){this.renderer=d;this.gl=d.gl;this.textures=a.textures;var c=this.effect=a.effect;var b=this.type=c.type;this.direction=c.attributes?c.attributes.direction:null;this.duration=c.duration*1000;this.buildOut=b==="buildOut";this.buildIn=b==="buildIn";this.program={};this.isCompleted=false;if(a.programNames){this.setupProgram(a)}},setupProgram:function(c){var e=this.gl;for(var b=0,d=c.programNames.length;b<d;b++){var a=c.programNames[b];this.program[a]=KNWebGLUtil.setupProgram(e,a)}e.enable(e.BLEND);e.blendFunc(e.SRC_ALPHA,e.ONE_MINUS_SRC_ALPHA)}});var KNWebGLContents=Class.create(KNWebGLProgram,{initialize:function($super,a,b){this.programData={name:"contents",effect:b.effect,textures:b.textures};$super(a,this.programData);this.percentfinished=0;this.animationWillBeginWithContext()},animationWillBeginWithContext:function(){var e=this.renderer;var g=this.gl;var b=this.textures[0].textureRect;var a=CGRectMake(0,0,b.size.width,b.size.height);var f=CGSizeMake(2,2);var d=this.contentsShader=new TSDGLShader(g);d.initWithContentsShader();d.setMat4WithTransform3D(e.slideProjectionMatrix,kTSDGLShaderUniformMVPMatrix);d.setGLint(0,kTSDGLShaderUniformTexture2);d.setGLint(1,kTSDGLShaderUniformTexture);var c=this.contentsDataBuffer=new TSDGLDataBuffer(g);c.initWithVertexRect(a,TSDRectUnit,f,false,false)},drawFrame:function(f,a,d){var c=this.renderer;var e=this.gl;var b=this.percentfinished;b+=f/d;if(b>=1){b=1;this.isCompleted=true}this.percentfinished=b;this.p_drawContents(b)},p_drawContents:function(c){var f=this.gl;var a=this.textures;var e=a[0].texture;var b=a[1].texture;var d=TSUSineMap(c);if(c>=1){d=1}f.activeTexture(f.TEXTURE1);f.bindTexture(f.TEXTURE_2D,e);f.activeTexture(f.TEXTURE0);f.bindTexture(f.TEXTURE_2D,b);this.contentsShader.setGLFloat(d,"mixFactor");f.blendFunc(f.ONE,f.ONE_MINUS_SRC_ALPHA);this.contentsDataBuffer.drawWithShader(this.contentsShader,true)}});var KNWebGLDrawable=Class.create(KNWebGLProgram,{initialize:function($super,a,b){this.programData={name:"WebDrawable",programNames:["defaultTextureAndOpacity"],effect:b.effect,textures:b.textures};$super(a,this.programData);this.Opacity=1;this.animationWillBeginWithContext()},animationWillBeginWithContext:function(){var h=this.renderer;var g=this.gl;var f=this.program.defaultTextureAndOpacity;var j=f.uniforms;var a=f.attribs;var e=this.textures[0];g.useProgram(f.shaderProgram);g.blendFunc(g.ONE,g.ONE_MINUS_SRC_ALPHA);var c=this.textureCoordinateBuffer=g.createBuffer();var d=this.textureCoordinates=[0,0,0,1,1,0,1,1,];g.bindBuffer(g.ARRAY_BUFFER,c);g.bufferData(g.ARRAY_BUFFER,new Float32Array(d),g.STATIC_DRAW);var i=this.positionBuffer=g.createBuffer();var b=this.boxPosition=[0,0,0,0,e.height,0,e.width,0,0,e.width,e.height,0];g.bindBuffer(g.ARRAY_BUFFER,i);g.bufferData(g.ARRAY_BUFFER,new Float32Array(b),g.STATIC_DRAW);this.MVPMatrix=WebGraphics.translateMatrix4(h.slideProjectionMatrix,e.offset.pointX,g.viewportHeight-e.offset.pointY-e.height,0)},drawFrame:function(){var e=this.renderer;var g=this.gl;var c=this.program.defaultTextureAndOpacity;var b=c.uniforms;var f=c.attribs;var a=this.textures;var d=a[0].texture;g.useProgram(c.shaderProgram);g.bindBuffer(g.ARRAY_BUFFER,this.textureCoordinateBuffer);g.vertexAttribPointer(f.TexCoord,2,g.FLOAT,false,0,0);g.enableVertexAttribArray(f.TexCoord);g.bindBuffer(g.ARRAY_BUFFER,this.positionBuffer);g.vertexAttribPointer(f.Position,3,g.FLOAT,false,0,0);g.enableVertexAttribArray(f.Position);g.uniformMatrix4fv(b.MVPMatrix,false,this.MVPMatrix);g.uniform1f(b.Opacity,this.Opacity);g.activeTexture(g.TEXTURE0);g.uniform1i(b.Texture,0);g.bindTexture(g.TEXTURE_2D,d);g.drawArrays(g.TRIANGLE_STRIP,0,4)}});var KNWebGLFramebufferDrawable=Class.create(KNWebGLProgram,{initialize:function($super,d,f){var e=d.gl;var a=this.frameRect=f.frameRect;var c=this.texture=this.createFramebufferTexture(e,a);this.buffer=this.createFramebuffer(e,c);var b={width:a.size.width,height:a.size.height,offset:{pointX:0,pointY:0},texture:c};this.programData={name:"FramebufferDrawable",programNames:["defaultTexture"],effect:f.effect,textures:[b]};$super(d,this.programData);this.drawableFrame=f.drawableFrame;this.animationWillBeginWithContext()},createFramebufferTexture:function(c,b){var a=c.createTexture();c.bindTexture(c.TEXTURE_2D,a);c.pixelStorei(c.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);c.pixelStorei(c.UNPACK_FLIP_Y_WEBGL,false);c.texParameteri(c.TEXTURE_2D,c.TEXTURE_WRAP_S,c.CLAMP_TO_EDGE);c.texParameteri(c.TEXTURE_2D,c.TEXTURE_WRAP_T,c.CLAMP_TO_EDGE);c.texParameteri(c.TEXTURE_2D,c.TEXTURE_MIN_FILTER,c.LINEAR);c.texParameteri(c.TEXTURE_2D,c.TEXTURE_MAG_FILTER,c.LINEAR);c.texImage2D(c.TEXTURE_2D,0,c.RGBA,b.size.width,b.size.height,0,c.RGBA,c.UNSIGNED_BYTE,null);c.bindTexture(c.TEXTURE_2D,null);return a},createFramebuffer:function(c,b){var a=c.createFramebuffer();c.bindFramebuffer(c.FRAMEBUFFER,a);c.framebufferTexture2D(c.FRAMEBUFFER,c.COLOR_ATTACHMENT0,c.TEXTURE_2D,b,0);return a},animationWillBeginWithContext:function(){var h=this.renderer;var g=this.gl;var f=this.program.defaultTexture;var j=f.uniforms;var a=f.attribs;var e=this.textures[0];g.useProgram(f.shaderProgram);g.blendFunc(g.ONE,g.ONE_MINUS_SRC_ALPHA);var c=this.textureCoordinateBuffer=g.createBuffer();var d=this.textureCoordinates=[0,1,0,0,1,1,1,0,];g.bindBuffer(g.ARRAY_BUFFER,c);g.bufferData(g.ARRAY_BUFFER,new Float32Array(d),g.STATIC_DRAW);var i=this.positionBuffer=g.createBuffer();var b=this.boxPosition=[0,0,0,0,e.height,0,e.width,0,0,e.width,e.height,0];g.bindBuffer(g.ARRAY_BUFFER,i);g.bufferData(g.ARRAY_BUFFER,new Float32Array(b),g.STATIC_DRAW);this.MVPMatrix=WebGraphics.translateMatrix4(h.slideProjectionMatrix,e.offset.pointX,g.viewportHeight-e.offset.pointY-e.height,0)},drawFrame:function(){var e=this.renderer;var g=this.gl;var c=this.program.defaultTexture;var b=c.uniforms;var f=c.attribs;var a=this.textures;var d=a[0].texture;g.useProgram(c.shaderProgram);g.bindBuffer(g.ARRAY_BUFFER,this.textureCoordinateBuffer);g.vertexAttribPointer(f.TexCoord,2,g.FLOAT,false,0,0);g.enableVertexAttribArray(f.TexCoord);g.bindBuffer(g.ARRAY_BUFFER,this.positionBuffer);g.vertexAttribPointer(f.Position,3,g.FLOAT,false,0,0);g.enableVertexAttribArray(f.Position);g.uniformMatrix4fv(b.MVPMatrix,false,this.MVPMatrix);g.activeTexture(g.TEXTURE0);g.uniform1i(b.Texture,0);g.bindTexture(g.TEXTURE_2D,d);g.drawArrays(g.TRIANGLE_STRIP,0,4)}});var KNWebGLDissolve=Class.create(KNWebGLProgram,{initialize:function($super,a,b){this.programData={name:"dissolve",programNames:["defaultTextureAndOpacity"],effect:b.effect,textures:b.textures};$super(a,this.programData);this.percentfinished=0;this.animationWillBeginWithContext()},animationWillBeginWithContext:function(){var h=this.renderer;var g=this.gl;var f=this.program.defaultTextureAndOpacity;var j=f.uniforms;var a=f.attribs;var e=this.textures[0];g.useProgram(f.shaderProgram);g.blendFunc(g.ONE,g.ONE_MINUS_SRC_ALPHA);var c=this.textureCoordinateBuffer=g.createBuffer();var d=this.textureCoordinates=[0,0,0,1,1,0,1,1,];g.bindBuffer(g.ARRAY_BUFFER,c);g.bufferData(g.ARRAY_BUFFER,new Float32Array(d),g.STATIC_DRAW);var i=this.positionBuffer=g.createBuffer();var b=this.boxPosition=[0,0,0,0,e.height,0,e.width,0,0,e.width,e.height,0];g.bindBuffer(g.ARRAY_BUFFER,i);g.bufferData(g.ARRAY_BUFFER,new Float32Array(b),g.STATIC_DRAW);this.MVPMatrix=WebGraphics.translateMatrix4(h.slideProjectionMatrix,e.offset.pointX,g.viewportHeight-(e.offset.pointY+e.height),0);this.drawFrame(0,0,4)},drawFrame:function(e,a,d){var b=this.percentfinished;b+=e/d;b>1?b=1:0;var c=TSUSineMap(b);if(b===1){c=1}if(this.buildOut){c=1-c}this.percentfinished=b;this.percentAlpha=c;this.draw()},draw:function(){var f=this.renderer;var h=this.gl;var c=this.program.defaultTextureAndOpacity;var b=c.uniforms;var g=c.attribs;var a=this.textures;var e=a[0].texture;var d;if(a.length>1){d=a[1].texture}h.useProgram(c.shaderProgram);h.blendFunc(h.ONE,h.ONE_MINUS_SRC_ALPHA);h.bindBuffer(h.ARRAY_BUFFER,this.textureCoordinateBuffer);h.vertexAttribPointer(g.TexCoord,2,h.FLOAT,false,0,0);h.enableVertexAttribArray(g.TexCoord);h.bindBuffer(h.ARRAY_BUFFER,this.positionBuffer);h.vertexAttribPointer(g.Position,3,h.FLOAT,false,0,0);h.enableVertexAttribArray(g.Position);h.uniformMatrix4fv(b.MVPMatrix,false,this.MVPMatrix);h.activeTexture(h.TEXTURE0);h.uniform1i(b.Texture,0);if(d){h.bindTexture(h.TEXTURE_2D,d);h.uniform1f(b.Opacity,1);h.drawArrays(h.TRIANGLE_STRIP,0,4)}h.bindTexture(h.TEXTURE_2D,e);h.uniform1f(b.Opacity,this.percentAlpha);h.drawArrays(h.TRIANGLE_STRIP,0,4)}});var KNWebGLTransitionIris=Class.create(KNWebGLProgram,{initialize:function($super,a,c){this.programData={name:"apple:wipe-iris",programNames:["iris"],effect:c.effect,textures:c.textures};$super(a,this.programData);var b=this.direction;var e=b===KNDirection.kKNDirectionOut;var d=this.buildOut;if((d&&e)||(!d&&!e)){this.mix=0;this.percentfinished=1}else{this.mix=1;this.percentfinished=0}this.percentAlpha=0;this.animationWillBeginWithContext()},animationWillBeginWithContext:function(){var h=this.renderer;var g=this.gl;var f=this.program.iris;var a=f.attribs;var j=f.uniforms;var e=this.textures[0];g.useProgram(f.shaderProgram);g.blendFunc(g.ONE,g.ONE_MINUS_SRC_ALPHA);this.scale=e.width/e.height;var c=this.textureCoordinatesBuffer=g.createBuffer();var d=this.textureCoordinates=[0,0,0,1,1,0,1,1,];g.bindBuffer(g.ARRAY_BUFFER,c);g.bufferData(g.ARRAY_BUFFER,new Float32Array(d),g.STATIC_DRAW);var i=this.positionBuffer=g.createBuffer();var b=this.boxPosition=[0,0,0,0,e.height,0,e.width,0,0,e.width,e.height,0];g.bindBuffer(g.ARRAY_BUFFER,i);g.bufferData(g.ARRAY_BUFFER,new Float32Array(b),g.STATIC_DRAW);this.MVPMatrix=WebGraphics.translateMatrix4(h.slideProjectionMatrix,e.offset.pointX,g.viewportHeight-(e.offset.pointY+e.height),0);this.drawFrame(0,0,4)},drawFrame:function(g,a,d){var f=this.buildOut;var e=this.direction===KNDirection.kKNDirectionOut;var b=this.percentfinished;if((f&&e)||(!f&&!e)){b-=g/d;b<0?b=0:0}else{b+=g/d;b>1?b=1:0}var c=TSUSineMap(b);if(b===1){c=1}if(f){c=1-c}this.percentAlpha=c;this.percentfinished=b;this.draw()},draw:function(){var f=this.renderer;var e=this.gl;var d=this.program.iris;var a=d.attribs;var h=d.uniforms;var i=this.textures;var g=i[0].texture;var c=i[0];var j;var b=this.scale;if(i.length>1){j=i[1].texture}e.useProgram(d.shaderProgram);e.blendFunc(e.ONE,e.ONE_MINUS_SRC_ALPHA);e.bindBuffer(e.ARRAY_BUFFER,this.textureCoordinatesBuffer);e.vertexAttribPointer(a.TexCoord,2,e.FLOAT,false,0,0);e.enableVertexAttribArray(a.TexCoord);e.bindBuffer(e.ARRAY_BUFFER,this.positionBuffer);e.vertexAttribPointer(a.Position,3,e.FLOAT,false,0,0);e.enableVertexAttribArray(a.Position);e.uniformMatrix4fv(h.MVPMatrix,false,this.MVPMatrix);e.activeTexture(e.TEXTURE0);e.uniform1i(h.Texture,0);e.uniform1f(h.Opacity,1);if(j){e.bindTexture(e.TEXTURE_2D,j);e.uniform1f(h.PercentForAlpha,0);e.uniform1f(h.Scale,b);e.uniform1f(h.Mix,0);e.drawArrays(e.TRIANGLE_STRIP,0,4)}e.bindTexture(e.TEXTURE_2D,g);e.uniform1f(h.PercentForAlpha,this.percentAlpha);e.uniform1f(h.Scale,b);e.uniform1f(h.Mix,this.mix);e.drawArrays(e.TRIANGLE_STRIP,0,4)}});var KNWebGLBuildIris=Class.create(KNWebGLProgram,{initialize:function($super,j,d){var l=d.effect;this.programData={name:"apple:wipe-iris",programNames:["iris"],effect:l,textures:d.textures};$super(j,this.programData);var k=this.direction;var a=k===KNDirection.kKNDirectionOut;var b=this.buildOut;if((b&&a)||(!b&&!a)){this.mix=0;this.percentfinished=1}else{this.mix=1;this.percentfinished=0}this.percentAlpha=0;this.drawableObjects=[];for(var e=0,c=this.textures.length;e<c;e++){var h=d.textures[e];var g={effect:l,textures:[h]};var f=new KNWebGLDrawable(j,g);this.drawableObjects.push(f)}this.parentOpacity=l.baseLayer.initialState.opacity;this.animationWillBeginWithContext()},animationWillBeginWithContext:function(){var k=this.renderer;var o=this.gl;var d=this.program.iris;var g=d.attribs;var q=d.uniforms;o.useProgram(d.shaderProgram);o.blendFunc(o.ONE,o.ONE_MINUS_SRC_ALPHA);var m=o.createBuffer();var b=[0,0,0,1,1,0,1,1,];o.bindBuffer(o.ARRAY_BUFFER,m);o.bufferData(o.ARRAY_BUFFER,new Float32Array(b),o.STATIC_DRAW);var l=o.viewportWidth;var a=o.viewportHeight;this.irisSystems=[];for(var p=0,c=this.textures.length;p<c;p++){var e=this.textures[p];var j=e.width;var h=e.height;var s=e.width/e.height;var n=o.createBuffer();var f=[0,0,0,0,e.height,0,e.width,0,0,e.width,e.height,0];o.bindBuffer(o.ARRAY_BUFFER,n);o.bufferData(o.ARRAY_BUFFER,new Float32Array(f),o.STATIC_DRAW);var r=WebGraphics.translateMatrix4(k.slideProjectionMatrix,e.offset.pointX,o.viewportHeight-(e.offset.pointY+e.height),0);this.irisSystems[p]={textureCoordinatesBuffer:m,positionBuffer:n,MVPMatrix:r,scale:s}}},drawFrame:function(x,b,a){var n=this.renderer;var q=this.gl;var t=this.buildOut;var u=this.direction===KNDirection.kKNDirectionOut;var m=this.percentfinished;if((t&&u)||(!t&&!u)){m-=x/a;if(m<=0){m=0;this.isCompleted=true}}else{m+=x/a;if(m>=1){m=1;this.isCompleted=true}}var B=TSUSineMap(m);if(m===1){B=1}if(t){B=1-B}this.percentAlpha=B;this.percentfinished=m;q.blendFunc(q.ONE,q.ONE_MINUS_SRC_ALPHA);for(var r=0,d=this.textures.length;r<d;r++){var k=this.textures[r];var s=k.initialState;var h=k.animations;if(k.hasHighlightedBulletAnimation){if(!s.hidden){var c;if(h.length>0&&h[0].property==="opacity"){var e=h[0].from.scalar;var g=h[0].to.scalar;var j=g-e;if(t){c=e+j*(1-this.percentfinished)}else{c=e+j*this.percentfinished}}else{c=k.initialState.opacity}this.drawableObjects[r].Opacity=this.parentOpacity*c;this.drawableObjects[r].drawFrame()}}else{if(k.animations.length>0){if(this.isCompleted){if(!t){this.drawableObjects[r].Opacity=this.parentOpacity*k.initialState.opacity;this.drawableObjects[r].drawFrame()}continue}var f=this.program.iris;var l=f.attribs;var w=f.uniforms;var v=this.irisSystems[r];var A=v.scale;q.useProgram(f.shaderProgram);var o=v.textureCoordinatesBuffer;q.bindBuffer(q.ARRAY_BUFFER,o);q.vertexAttribPointer(l.TexCoord,2,q.FLOAT,false,0,0);q.enableVertexAttribArray(l.TexCoord);var p=v.positionBuffer;q.bindBuffer(q.ARRAY_BUFFER,p);q.vertexAttribPointer(l.Position,3,q.FLOAT,false,0,0);q.enableVertexAttribArray(l.Position);var z=v.MVPMatrix;q.uniformMatrix4fv(w.MVPMatrix,false,z);q.activeTexture(q.TEXTURE0);q.uniform1i(w.Texture,0);q.uniform1f(w.Opacity,this.parentOpacity*k.initialState.opacity);q.bindTexture(q.TEXTURE_2D,k.texture);q.uniform1f(w.PercentForAlpha,this.percentAlpha);q.uniform1f(w.Scale,A);q.uniform1f(w.Mix,this.mix);q.drawArrays(q.TRIANGLE_STRIP,0,4)}else{if(!k.initialState.hidden){this.drawableObjects[r].Opacity=this.parentOpacity*k.initialState.opacity;this.drawableObjects[r].drawFrame()}}}}}});var KNWebGLTransitionTwist=Class.create(KNWebGLProgram,{initialize:function($super,f,c){this.programData={name:"com.apple.iWork.Keynote.BUKTwist",programNames:["twist"],effect:c.effect,textures:c.textures};$super(f,this.programData);var d=this.gl;this.direction=this.effect.attributes.direction;this.percentfinished=0;var g=this.mNumPoints=24;var n=d.viewportWidth/(g-1);var m=d.viewportHeight/(g-1);var k=1/(g-1);var i,h;var a=this.TexCoords=[];var j=this.PositionCoords=[];var l=this.NormalCoords=[];for(h=0;h<g;h++){for(i=0;i<g;i++){var e=h*g+i;j[e*3]=i*n;j[e*3+1]=h*m;j[e*3+2]=0;a.push(i*k);a.push(h*k);l.push(0);l.push(0);l.push(-1)}}var e=0;var b=this.elementArray=[];for(h=0;h<g-1;h++){for(i=0;i<g;i++){b[e++]=(h)*(g)+i;b[e++]=(h+1)*(g)+i}}this.animationWillBeginWithContext()},animationWillBeginWithContext:function(){var c=this.renderer;var e=this.gl;var b=this.program.twist;var a=b.uniforms;var d=b.attribs;e.enable(e.CULL_FACE);this.buffers={};this.buffers.TexCoord=e.createBuffer();e.bindBuffer(e.ARRAY_BUFFER,this.buffers.TexCoord);e.bufferData(e.ARRAY_BUFFER,new Float32Array(this.TexCoords),e.STATIC_DRAW);e.vertexAttribPointer(d.TexCoord,2,e.FLOAT,false,0,0);e.enableVertexAttribArray(d.TexCoord);this.buffers.Position=e.createBuffer();e.bindBuffer(e.ARRAY_BUFFER,this.buffers.Position);e.bufferData(e.ARRAY_BUFFER,new Float32Array(this.PositionCoords),e.DYNAMIC_DRAW);e.vertexAttribPointer(d.Position,3,e.FLOAT,false,0,0);e.enableVertexAttribArray(d.Position);this.buffers.Normal=e.createBuffer();e.bindBuffer(e.ARRAY_BUFFER,this.buffers.Normal);e.bufferData(e.ARRAY_BUFFER,new Float32Array(this.NormalCoords),e.DYNAMIC_DRAW);e.vertexAttribPointer(d.Normal,3,e.FLOAT,false,0,0);e.enableVertexAttribArray(d.Normal);this.MVPMatrix=c.slideProjectionMatrix;e.uniformMatrix4fv(a.MVPMatrix,false,this.MVPMatrix);this.AffineTransform=new Matrix3();this.AffineTransform.affineScale(1,-1);this.AffineTransform.affineTranslate(0,1);this.AffineIdentity=new Matrix3();this.elementIndicesBuffer=e.createBuffer();e.bindBuffer(e.ELEMENT_ARRAY_BUFFER,this.elementIndicesBuffer);e.bufferData(e.ELEMENT_ARRAY_BUFFER,new Uint16Array(this.elementArray),e.STATIC_DRAW);e.activeTexture(e.TEXTURE0);e.uniform1i(a.Texture,0);this.drawFrame(0,0,4)},drawFrame:function(A,c,a){var v=this.gl;var i=this.program.twist;var n=i.attribs;var s=this.percentfinished;s+=A/a;s>1?s=1:0;this.specularcolor=TSUSineMap(s*2)*0.5;var j,k;var p=v.viewportHeight/2;var u=this.mNumPoints;var h=this.TexCoords;var e=this.PositionCoords;var b=this.NormalCoords;for(j=0;j<u;j++){for(k=0;k<u;k++){var g=j*u+k;var d={};d.x=h[g*2];d.y=h[g*2+1];var w=-Math.PI*TwistFX(this.direction===KNDirection.kKNDirectionLeftToRight?d.x:(1-d.x),s);var m={};m.y=(p-(p*(1-d.y*2)*Math.cos(w)));m.z=(p*(1-d.y*2)*Math.sin(w));e[g*3+1]=m.y;e[g*3+2]=m.z}}for(j=0;j<u;j++){for(k=0;k<u;k++){var z=new vector3();var g=j*u+k;for(var o=0;o<4;o++){var t=0,r=0,D=0,C=0;switch(o){case 0:t=1;C=1;break;case 1:r=1;D=-1;break;case 2:t=-1;C=-1;break;case 3:r=-1;D=1;default:break}if((k+t)<0||(k+D)<0||(j+r)<0||(j+C)<0||k+t>=u||k+D>=u||j+r>=u||j+C>=u){continue}var l=new vector3([e[g*3],e[g*3+1],e[g*3+2]]);var B=new vector3([e[((j+r)*u+(k+t))*3],e[((j+r)*u+(k+t))*3+1],e[((j+r)*u+(k+t))*3+2]]);var f=new vector3([e[(((j+C)*u)+(k+D))*3],e[(((j+C)*u)+(k+D))*3+1],e[(((j+C)*u)+(k+D))*3+2]]);B.subtract(l);f.subtract(l);B.cross(f);z.add(B)}z.normalize();z.scale(-1);z=z.getArray();b[g*3]=z[0];b[g*3+1]=z[1];b[g*3+2]=z[2]}}v.bindBuffer(v.ARRAY_BUFFER,this.buffers.Position);v.bufferData(v.ARRAY_BUFFER,new Float32Array(e),v.DYNAMIC_DRAW);v.vertexAttribPointer(n.Position,3,v.FLOAT,false,0,0);v.bindBuffer(v.ARRAY_BUFFER,this.buffers.Normal);v.bufferData(v.ARRAY_BUFFER,new Float32Array(b),v.DYNAMIC_DRAW);v.vertexAttribPointer(n.Normal,3,v.FLOAT,false,0,0);this.percentfinished=s;this.draw()},draw:function(){var g=this.renderer;var e=this.gl;var d=this.program.twist;var j=d.uniforms;var k=this.textures;var h=k[0].texture;var l=k[1].texture;var i=this.mNumPoints;var f=this.specularcolor;var a=this.AffineTransform.getColumnMajorFloat32Array();var b=this.AffineIdentity.getColumnMajorFloat32Array();var c=this.elementIndicesBuffer;if(!f){f=0}e.uniform1f(j.SpecularColor,f);if(this.percentfinished<0.5){e.cullFace(e.BACK);e.bindTexture(e.TEXTURE_2D,h);e.bindBuffer(e.ELEMENT_ARRAY_BUFFER,c);e.uniformMatrix3fv(j.TextureMatrix,false,a);e.uniform1f(j.FlipNormals,1);for(y=0;y<i-1;y++){e.drawElements(e.TRIANGLE_STRIP,i*2,e.UNSIGNED_SHORT,y*i*2*(2))}e.cullFace(e.FRONT);e.bindTexture(e.TEXTURE_2D,l);e.uniformMatrix3fv(j.TextureMatrix,false,b);e.uniform1f(j.FlipNormals,-1);for(y=0;y<i-1;y++){e.drawElements(e.TRIANGLE_STRIP,i*2,e.UNSIGNED_SHORT,y*i*2*(2))}}else{e.cullFace(e.FRONT);e.bindTexture(e.TEXTURE_2D,l);e.uniformMatrix3fv(j.TextureMatrix,false,b);e.uniform1f(j.FlipNormals,-1);for(y=0;y<i-1;y++){e.drawElements(e.TRIANGLE_STRIP,i*2,e.UNSIGNED_SHORT,y*i*2*(2))}e.cullFace(e.BACK);e.bindTexture(e.TEXTURE_2D,h);e.bindBuffer(e.ELEMENT_ARRAY_BUFFER,c);e.uniformMatrix3fv(j.TextureMatrix,false,a);e.uniform1f(j.SpecularColor,f);e.uniform1f(j.FlipNormals,1);for(y=0;y<i-1;y++){e.drawElements(e.TRIANGLE_STRIP,i*2,e.UNSIGNED_SHORT,y*i*2*(2))}}}});var KNWebGLTransitionColorPlanes=Class.create(KNWebGLProgram,{initialize:function($super,a,c){this.programData={name:"com.apple.iWork.Keynote.KLNColorPlanes",programNames:["colorPlanes"],effect:c.effect,textures:c.textures};$super(a,this.programData);var b=this.effect.attributes.direction;if(b!==KNDirection.kKNDirectionLeftToRight&&b!==KNDirection.kKNDirectionRightToLeft&&b!==KNDirection.kKNDirectionTopToBottom&&b!==KNDirection.kKNDirectionBottomToTop){b=KNDirection.kKNDirectionLeftToRight}this.direction=b;this.mNumColors=3;this.percentfinished=0;this.animationWillBeginWithContext()},animationWillBeginWithContext:function(){var f=this.renderer;var e=this.gl;var d=this.program.colorPlanes;var g=d.uniforms;var a=d.attribs;var c=this.textures[0];e.disable(e.CULL_FACE);e.blendFunc(e.ONE,e.ONE);var i=this.buffers={};i.TexCoord=e.createBuffer();e.bindBuffer(e.ARRAY_BUFFER,i.TexCoord);var b=this.TexCoords=[0,0,0,1,1,0,1,1,];e.bufferData(e.ARRAY_BUFFER,new Float32Array(b),e.STATIC_DRAW);e.vertexAttribPointer(a.TexCoord,2,e.FLOAT,false,0,0);e.enableVertexAttribArray(a.TexCoord);i.Position=e.createBuffer();e.bindBuffer(e.ARRAY_BUFFER,i.Position);var h=this.PositionCoords=[0,0,0,0,c.height,0,c.width,0,0,c.width,c.height,0];e.bufferData(e.ARRAY_BUFFER,new Float32Array(h),e.STATIC_DRAW);e.vertexAttribPointer(a.Position,3,e.FLOAT,false,0,0);e.enableVertexAttribArray(a.Position);this.MVPMatrix=f.slideProjectionMatrix;e.uniformMatrix4fv(g.MVPMatrix,false,this.MVPMatrix);e.activeTexture(e.TEXTURE0);e.uniform1i(g.Texture,0);this.drawFrame(0,0,4)},drawFrame:function(B,e,a){var s=this.renderer;var v=this.gl;var n=this.program.colorPlanes;var z=n.uniforms;var q=n.attribs;var g=this.textures;var p=g[0];var h=g[1];this.percentfinished+=B/a;this.percentfinished>1?this.percentfinished=1:0;var d=this.percentfinished;var A=this.direction;var t=0.25;var o=1;var w=(A==KNDirection.kKNDirectionRightToLeft||A==KNDirection.kKNDirectionBottomToTop);var b=(A==KNDirection.kKNDirectionLeftToRight||A==KNDirection.kKNDirectionRightToLeft);var c=1-(1-d)*(1-d);var m=b?p.width:p.height;var i=TSUSineMap(d*2);var C=i*m*t;var k=Math.sin(-c*2*Math.PI);k*=c*m*o;if(d<0.5){v.bindTexture(v.TEXTURE_2D,h.texture);v.uniform2fv(z.FlipTexCoords,new Float32Array([0,0]))}else{v.bindTexture(v.TEXTURE_2D,p.texture);if(A==KNDirection.kKNDirectionTopToBottom||A==KNDirection.kKNDirectionBottomToTop){v.uniform2fv(z.FlipTexCoords,new Float32Array([0,1]))}else{v.uniform2fv(z.FlipTexCoords,new Float32Array([1,0]))}}for(var f=0,l=this.mNumColors;f<l;f++){var r=f/l;var u=WebGraphics.colorWithHSBA(r,1,1,1/l);v.uniform4fv(z.ColorMask,new Float32Array([u.red,u.green,u.blue,u.alpha]));var x=(Math.PI/180)*(180*(TSUSineMap(d)));var j=WebGraphics.translateMatrix4(this.MVPMatrix,p.width/2,p.height/2,k);j=WebGraphics.rotateMatrix4AboutXYZ(j,x,(w?-1:1)*(b?0:1),(w?-1:1)*(b?1:0),0);j=WebGraphics.translateMatrix4(j,-p.width/2,-p.height/2,C*(f-1));v.uniformMatrix4fv(z.MVPMatrix,false,j);v.drawArrays(v.TRIANGLE_STRIP,0,4)}}});var KNWebGLTransitionFlop=Class.create(KNWebGLProgram,{initialize:function($super,m,p){this.programData={name:"com.apple.iWork.Keynote.BUKFlop",programNames:["flop","defaultTexture"],effect:p.effect,textures:p.textures};$super(m,this.programData);var q=this.effect.attributes.direction;if(q!==KNDirection.kKNDirectionLeftToRight&&q!==KNDirection.kKNDirectionRightToLeft&&q!==KNDirection.kKNDirectionTopToBottom&&q!==KNDirection.kKNDirectionBottomToTop){q=KNDirection.kKNDirectionLeftToRight}this.direction=q;this.percentfinished=0;var i=this.elementArray=[];var o=this.gl;var b=o.viewportWidth;var a=o.viewportHeight;var l=b;var j=a;if(q===KNDirection.kKNDirectionTopToBottom||q===KNDirection.kKNDirectionBottomToTop){j*=0.5}else{l*=0.5}var n=this.mNumPoints=8;var c=0;for(e=0;e<n-1;e++){for(f=0;f<n;f++){i[c++]=(e+0)*(n)+f;i[c++]=(e+1)*(n)+f}}var h=l/(n-1);var g=j/(n-1);var d=(q==KNDirection.kKNDirectionTopToBottom)?j:d=0;var r=(q==KNDirection.kKNDirectionRightToLeft)?l:r=0;var k=this.attributeBufferData={Position:[],TexCoords:[],Normal:[],ShadowPosition:[],ShadowTexCoord:[],PreviousPosition:[],PreviousTexCoords:[],PreviousNormal:[]};for(var e=0;e<n;e++){for(var f=0;f<n;f++){c=e*n+f;KNWebGLUtil.setPoint3DAtIndexForAttribute(WebGraphics.makePoint3D(f*h+r,e*g,0),c,k.Position);KNWebGLUtil.setPoint2DAtIndexForAttribute(WebGraphics.makePoint((f*h+r)/b,(e*g+d)/a),c,k.TexCoords);KNWebGLUtil.setPoint3DAtIndexForAttribute(WebGraphics.makePoint3D(0,0,1),c,k.Normal)}}this.animationWillBeginWithContext()},animationWillBeginWithContext:function(){var l=this.renderer;var m=this.gl;var d=this.program.flop;var g=d.attribs;var p=d.uniforms;var e=this.program.defaultTexture;var r=this.MVPMatrix=l.slideProjectionMatrix;var k=m.viewportWidth;var h=m.viewportHeight;var q=this.direction;if(q===KNDirection.kKNDirectionTopToBottom||q===KNDirection.kKNDirectionBottomToTop){h*=0.5}else{k*=0.5}var b=[0,0,0,0.5,1,0,1,0.5,];var f=[0,0,0,0,h,0,k,0,0,k,h,0,];var c=[0,0.5,0,1,1,0.5,1,1,];var a=[0,h,0,0,h*2,0,k,h,0,k,h*2,0,];KNWebGLUtil.enableAttribs(m,d);var j=this.attributeBufferData;var o=this.buffers={};var n=this.Coordinates={};o.TexCoord=m.createBuffer();m.bindBuffer(m.ARRAY_BUFFER,o.TexCoord);m.bufferData(m.ARRAY_BUFFER,new Float32Array(j.TexCoords),m.DYNAMIC_DRAW);m.vertexAttribPointer(g.TexCoord,2,m.FLOAT,false,0,0);o.Position=m.createBuffer();m.bindBuffer(m.ARRAY_BUFFER,o.Position);m.bufferData(m.ARRAY_BUFFER,new Float32Array(j.Position),m.DYNAMIC_DRAW);m.vertexAttribPointer(g.Position,3,m.FLOAT,false,0,0);o.Normal=m.createBuffer();m.bindBuffer(m.ARRAY_BUFFER,o.Normal);m.bufferData(m.ARRAY_BUFFER,new Float32Array(j.Normal),m.DYNAMIC_DRAW);m.vertexAttribPointer(g.Normal,3,m.FLOAT,false,0,0);m.uniformMatrix4fv(p.MVPMatrix,false,r);var i=this.AffineTransform=new Matrix3();if(q===KNDirection.kKNDirectionTopToBottom){i.affineScale(1,-1);i.affineTranslate(0,1)}else{if(q==KNDirection.kKNDirectionBottomToTop){i.affineScale(1,-1);i.affineTranslate(0,1);b=[0,0.5,0,1,1,0.5,1,1,];c=[0,0,0,0.5,1,0,1,0.5,];f=[0,h,0,0,h*2,0,k,h,0,k,h*2,0,];a=[0,0,0,0,h,0,k,0,0,k,h,0,]}else{if(q==KNDirection.kKNDirectionRightToLeft){i.affineScale(-1,1);i.affineTranslate(1,0);b=[0,0,0,1,0.5,0,0.5,1,];c=[0.5,0,0.5,1,1,0,1,1,];a=[k,0,0,k,h,0,k*2,0,0,k*2,h,0,]}else{if(q===KNDirection.kKNDirectionLeftToRight){i.affineScale(-1,1);i.affineTranslate(1,0);f=[k,0,0,k,h,0,k*2,0,0,k*2,h,0,];b=[0.5,0,0.5,1,1,0,1,1,];c=[0,0,0,1,0.5,0,0.5,1,];a=[0,0,0,0,h,0,k,0,0,k,h,0,]}}}}this.AffineIdentity=new Matrix3();this.elementIndicesBuffer=m.createBuffer();m.bindBuffer(m.ELEMENT_ARRAY_BUFFER,this.elementIndicesBuffer);m.bufferData(m.ELEMENT_ARRAY_BUFFER,new Uint16Array(this.elementArray),m.STATIC_DRAW);n.DefaultTexture=b;n.DefaultTexture2=c;n.DefaultPosition=f;n.DefaultPosition2=a;KNWebGLUtil.enableAttribs(m,e);o.TextureCoordinates=m.createBuffer();o.PositionCoordinates=m.createBuffer();m.bindBuffer(m.ARRAY_BUFFER,o.TextureCoordinates);m.bindBuffer(m.ARRAY_BUFFER,o.PositionCoordinates);m.bufferData(m.ARRAY_BUFFER,new Float32Array(b),m.DYNAMIC_DRAW);m.vertexAttribPointer(e.attribs.TexCoord,2,m.FLOAT,false,0,0);m.bufferData(m.ARRAY_BUFFER,new Float32Array(f),m.DYNAMIC_DRAW);m.vertexAttribPointer(e.attribs.Position,3,m.FLOAT,false,0,0);m.uniform1i(e.uniforms.Texture,0);m.uniformMatrix4fv(e.uniforms.MVPMatrix,false,r);m.useProgram(d.shaderProgram);m.activeTexture(m.TEXTURE0);m.uniform1i(d.uniforms.Texture,0);this.drawFrame(0,0,4)},drawFrame:function(c,a,b){this.percentfinished+=c/b;this.percentfinished>1?this.percentfinished=1:0;this.updateFlopWithPercent();this.draw()},updateFlopWithPercent:function(){var r=this.gl;var u=this.direction;var c=r.viewportWidth;var b=r.viewportHeight;var g=this.percentfinished*Math.PI;var f=this.percentfinished*this.percentfinished*this.percentfinished*Math.PI;var m=b/2;var o=c/2;var a=0;var q=this.mNumPoints;var n=this.attributeBufferData;for(var i=0;i<q;i++){for(var k=0;k<q;k++){var h=i*q+k;var e=KNWebGLUtil.getPoint2DForArrayAtIndex(n.TexCoords,h);e.x*=c;e.y*=b;if(u===KNDirection.kKNDirectionBottomToTop){a=e.y/m}else{if(u===KNDirection.kKNDirectionTopToBottom){a=(m*2-e.y)/m}else{if(u===KNDirection.kKNDirectionLeftToRight){a=e.x/o}else{a=(o*2-e.x)/o}}}var s=a*g+(1-a)*f;if(u===KNDirection.kKNDirectionLeftToRight||u===KNDirection.kKNDirectionTopToBottom){s*=-1}var d=Math.sin(s);var v=Math.cos(s);var j=KNWebGLUtil.getPoint3DForArrayAtIndex(n.Position,h);var l=KNWebGLUtil.getPoint3DForArrayAtIndex(n.Normal,h);if(u===KNDirection.kKNDirectionTopToBottom||u===KNDirection.kKNDirectionBottomToTop){var p=WebGraphics.makePoint3D(j.x,m-(m-e.y)*v,(m-e.y)*d);KNWebGLUtil.setPoint3DAtIndexForAttribute(p,h,n.Position);var t=WebGraphics.makePoint3D(l.x,-d,v);KNWebGLUtil.setPoint3DAtIndexForAttribute(t,h,n.Normal)}else{var p=WebGraphics.makePoint3D(o-(o-e.x)*v,j.y,-(o-e.x)*d);KNWebGLUtil.setPoint3DAtIndexForAttribute(p,h,n.Position);var t=WebGraphics.makePoint3D(-d,l.y,v);KNWebGLUtil.setPoint3DAtIndexForAttribute(t,h,n.Normal)}}}},draw:function(){var e=this.renderer;var d=this.gl;var c=this.program.flop;var b=this.program.defaultTexture;var h=this.textures;var l=h[1].texture;var j=h[0].texture;d.useProgram(b.shaderProgram);d.disable(d.CULL_FACE);d.bindTexture(d.TEXTURE_2D,l);var f=this.mNumPoints;var k=this.buffers;var a=this.Coordinates;var i=this.attributeBufferData;KNWebGLUtil.bindDynamicBufferWithData(d,b.attribs.Position,k.PositionCoordinates,a.DefaultPosition,3);KNWebGLUtil.bindDynamicBufferWithData(d,b.attribs.TexCoord,k.TextureCoordinates,a.DefaultTexture,2);d.drawArrays(d.TRIANGLE_STRIP,0,4);d.useProgram(b.shaderProgram);d.disable(d.CULL_FACE);d.bindTexture(d.TEXTURE_2D,j);KNWebGLUtil.bindDynamicBufferWithData(d,b.attribs.Position,k.PositionCoordinates,a.DefaultPosition2,3);KNWebGLUtil.bindDynamicBufferWithData(d,b.attribs.TexCoord,k.TextureCoordinates,a.DefaultTexture2,2);d.drawArrays(d.TRIANGLE_STRIP,0,4);d.enable(d.CULL_FACE);d.useProgram(c.shaderProgram);d.bindBuffer(d.ARRAY_BUFFER,k.Position);d.bufferData(d.ARRAY_BUFFER,new Float32Array(i.Position),d.DYNAMIC_DRAW);d.vertexAttribPointer(c.attribs.Position,3,d.FLOAT,false,0,0);d.bindBuffer(d.ARRAY_BUFFER,k.Normal);d.bufferData(d.ARRAY_BUFFER,new Float32Array(i.Normal),d.DYNAMIC_DRAW);d.vertexAttribPointer(c.attribs.Normal,3,d.FLOAT,false,0,0);d.bindBuffer(d.ARRAY_BUFFER,k.TexCoord);d.bufferData(d.ARRAY_BUFFER,new Float32Array(i.TexCoords),d.DYNAMIC_DRAW);d.vertexAttribPointer(c.attribs.TexCoord,2,d.FLOAT,false,0,0);d.cullFace(d.BACK);d.bindTexture(d.TEXTURE_2D,j);d.uniformMatrix3fv(c.uniforms.TextureMatrix,false,this.AffineTransform.getColumnMajorFloat32Array());d.uniform1f(c.uniforms.FlipNormals,-1);for(var g=0;g<f-1;g++){d.drawElements(d.TRIANGLE_STRIP,f*2,d.UNSIGNED_SHORT,g*f*2*(2))}d.bindTexture(d.TEXTURE_2D,l);d.cullFace(d.FRONT);d.uniformMatrix3fv(c.uniforms.TextureMatrix,false,this.AffineIdentity.getColumnMajorFloat32Array());d.uniform1f(c.uniforms.FlipNormals,1);for(var g=0;g<f-1;g++){d.drawElements(d.TRIANGLE_STRIP,f*2,d.UNSIGNED_SHORT,g*f*2*(2))}}});var KNWebGLBuildAnvil=Class.create(KNWebGLProgram,{initialize:function($super,g,b){var j=b.effect;this.programData={name:"com.apple.iWork.Keynote.BUKAnvil",programNames:["anvilsmoke","anvilspeck"],effect:j,textures:b.textures};$super(g,this.programData);var d=this.gl;this.smokeTexture=KNWebGLUtil.bindTextureWithImage(d,smokeImage);this.speckTexture=KNWebGLUtil.bindTextureWithImage(d,speckImage);this.percentfinished=0;this.drawableObjects=[];for(var c=0,a=this.textures.length;c<a;c++){var h=b.textures[c];var f={effect:j,textures:[h]};var e=new KNWebGLDrawable(g,f);this.drawableObjects.push(e)}this.objectY=1;this.parentOpacity=j.baseLayer.initialState.opacity;this.animationWillBeginWithContext()},animationWillBeginWithContext:function(){var l=this.renderer;var h=this.gl;this.smokeSystems=[];this.speckSystems=[];for(var e=0,b=this.textures.length;e<b;e++){var d=this.textures[e];var a=d.width;var m=d.height;var j=h.viewportWidth;var g=h.viewportHeight;var f=300;var k=new KNWebGLBuildAnvilSmokeSystem(l,this.program.anvilsmoke,{width:a,height:m},{width:j,height:g},this.duration,{width:f,height:1},{width:kParticleSize,height:kParticleSize},this.smokeTexture);f=40;var c=new KNWebGLBuildAnvilSpeckSystem(l,this.program.anvilspeck,{width:a,height:m},{width:j,height:g},this.duration,{width:f,height:1},{width:kParticleSize,height:kParticleSize},this.speckTexture);this.smokeSystems.push(k);this.speckSystems.push(c)}},drawFrame:function(a,h,r){var w=this.renderer;var n=this.gl;this.percentfinished+=a/r;if(this.percentfinished>=1){this.percentfinished=1;this.isCompleted=true}n.blendFunc(n.ONE,n.ONE_MINUS_SRC_ALPHA);for(var F=0,p=this.textures.length;F<p;F++){var e=this.textures[F];var C=e.initialState;var K=e.animations;if(e.hasHighlightedBulletAnimation){if(!C.hidden){var G;if(K.length>0&&K[0].property==="opacity"){var L=K[0].from.scalar;var x=K[0].to.scalar;var t=x-L;G=L+t*this.percentfinished}else{G=e.initialState.opacity}this.drawableObjects[F].Opacity=this.parentOpacity*G;this.drawableObjects[F].drawFrame()}}else{if(e.animations.length>0){if(this.isCompleted){this.drawableObjects[F].Opacity=this.parentOpacity*e.initialState.opacity;this.drawableObjects[F].drawFrame();continue}var b=e.width;var d=e.height;var A=e.offset.pointX;var z=e.offset.pointY;var q=n.viewportWidth;var o=n.viewportHeight;r/=1000;var E=Math.min(0.2,r*0.4);var s=Math.min(0.25,r*0.5);var B=this.cameraShakePointsWithRandomGenerator();var m=(this.percentfinished*r-E)/s;var v=WebGraphics.makePoint(0,0);if(0<m&&m<1){var I=Math.floor(m*kNumCameraShakePoints);var g=Math.ceil(WebGraphics.clamp(m*kNumCameraShakePoints,0,B.length-1));var J=B[I];var j=B[g];var f=m*kNumCameraShakePoints-I;v=WebGraphics.makePoint(WebGraphics.mix(J.x,j.x,f),WebGraphics.mix(J.y,j.y,f))}var u=WebGraphics.clamp((this.percentfinished*r)/E,0,1);var k=WebGraphics.clamp(((this.percentfinished*r)-E)/(r-E),0,1);var c=this.percentfinished;this.objectY=z+d;this.objectY*=(1-u*u);this.drawableObjects[F].MVPMatrix=WebGraphics.translateMatrix4(w.slideOrthoMatrix,A+(v.x*q),o-z-d+this.objectY+(v.y*o),0);this.drawableObjects[F].Opacity=this.parentOpacity*e.initialState.opacity;this.drawableObjects[F].drawFrame();var D=WebGraphics.translateMatrix4(w.slideProjectionMatrix,A,o-(z+(d+16))*(1-(k*k*0.02)),0);var l=this.smokeSystems[F];l.setMVPMatrix(D);l.drawFrame(k,1-(k*k));if(k<0.5){D=WebGraphics.translateMatrix4(w.slideOrthoMatrix,A,o-(z+d+16),0);var H=this.speckSystems[F];H.setMVPMatrix(D);H.drawFrame(k,WebGraphics.clamp(1-WebGraphics.sineMap(k)*2,0,1))}}else{if(!e.initialState.hidden){this.drawableObjects[F].Opacity=this.parentOpacity*e.initialState.opacity;this.drawableObjects[F].drawFrame()}}}}},cameraShakePointsWithRandomGenerator:function(){var e=[];var c=0.025;for(var a=0;a<kNumCameraShakePoints;a++){var d=1-(a/kNumCameraShakePoints);d*=d;var b=WebGraphics.makePoint(WebGraphics.randomBetween(-1,1)*c*d*0.4,Math.pow(-1,a)*c*d);e[a]=b}return e}});var KNWebGLBuildFlame=Class.create(KNWebGLProgram,{initialize:function($super,k,d){this.programData={name:"com.apple.iWork.Keynote.KLNFlame",programNames:["flame"],effect:d.effect,textures:d.textures};$super(k,this.programData);var g=this.gl;this.flameTexture=KNWebGLUtil.bindTextureWithImage(g,flameImage);this.percentfinished=0;this.drawableObjects=[];this.framebufferDrawableObjects=[];this.slideSize={width:g.viewportWidth,height:g.viewportHeight};var n=this.effect;for(var f=0,c=this.textures.length;f<c;f++){var l=d.textures[f];var j={effect:n,textures:[l]};var h=new KNWebGLDrawable(k,j);this.drawableObjects.push(h);var m={size:{width:l.width,height:l.height},origin:{x:l.offset.pointX,y:l.offset.pointY}};var a=this.frameOfEffectWithFrame(m);var e={effect:n,textures:[],drawableFrame:m,frameRect:a};var b=new KNWebGLFramebufferDrawable(k,e);this.framebufferDrawableObjects.push(b)}this.parentOpacity=n.baseLayer.initialState.opacity;this.animationWillBeginWithContext()},frameOfEffectWithFrame:function(g){var d=g.size;var f=this.slideSize;var i=(1.2-Math.min(1,Math.sqrt(d.width/f.width)))+1;var e=(1.25-Math.min(1,Math.sqrt(d.height/f.height)))+1;var h={width:Math.round(d.width*i),height:Math.round(d.height*e)};if(d.width/d.height<1){h.width=Math.max(h.width,(d.width+d.height))}var j={size:h,origin:{x:g.origin.x+(d.width-h.width)/2,y:g.origin.y+(d.height-h.height)/2}};j.origin.y-=(j.size.height-g.size.height)*0.25;var c=this.gl;var b={origin:{x:0,y:0},size:{width:c.viewportWidth,height:c.viewportHeight}};var a=CGRectIntersection(j,b);a=CGRectIntegral(a);return a},p_orthoTransformWithScale:function(f,e,d){var c={width:d.size.width*f,height:d.size.height*f};var b=WebGraphics.makeOrthoMatrix4(0,c.width,0,c.height,-1,1);var a=WebGraphics.translateMatrix4(b,e.x,-e.y,0);return a},animationWillBeginWithContext:function(){var j=this.renderer;var m=this.gl;var a=this.duration/1000;this.flameSystems=[];for(var n=0,c=this.textures.length;n<c;n++){var f=this.textures[n];var h=f.width;var g=f.height;var l=m.viewportWidth;var b=m.viewportHeight;var e=this.framebufferDrawableObjects[n];var q=e.frameRect;var s=e.drawableFrame;var k={x:f.offset.pointX-q.origin.x,y:f.offset.pointY+g-(q.origin.y+q.size.height)};var t=s.origin.y-q.origin.y;var o=q.origin.y+q.size.height-(s.origin.y+s.size.height);k.y+=(o-t);e.MVPMatrix=this.p_orthoTransformWithScale(1,k,q);var d=h/g;var p=Math.round(d*150);p*=(a+Math.max(0,1-a/2));var r=new KNWebGLBuildFlameSystem(j,this.program.flame,{width:h,height:g},{width:l,height:b},Math.max(2,this.duration),p,this.flameTexture);r.p_setupParticleDataWithTexture(f);this.flameSystems.push(r)}},drawFrame:function(a,h,u){var x=this.renderer;var m=this.gl;var c=this.program.flame;var n=c.uniforms;var g=this.buildOut;var l=this.percentfinished;l+=a/u;if(l>=1){l=1;this.isCompleted=true}this.percentfinished=l;m.blendFunc(m.ONE,m.ONE_MINUS_SRC_ALPHA);for(var K=0,p=this.textures.length;K<p;K++){var f=this.textures[K];var E=f.initialState;var N=f.animations;if(f.hasHighlightedBulletAnimation){if(!E.hidden){var L;if(N.length>0&&N[0].property==="opacity"){var O=N[0].from.scalar;var z=N[0].to.scalar;var v=z-O;L=O+v*this.percentfinished}else{L=f.initialState.opacity}this.drawableObjects[K].Opacity=this.parentOpacity*L;this.drawableObjects[K].drawFrame()}}else{if(f.animations.length>0){if(this.isCompleted){if(!g){this.drawableObjects[K].Opacity=this.parentOpacity*f.initialState.opacity;this.drawableObjects[K].drawFrame()}continue}var b=f.width;var e=f.height;var C=f.offset.pointX;var B=f.offset.pointY;var r=m.viewportWidth;var o=m.viewportHeight;u/=1000;var d=l;if(g){d=1-d}var J=g?0.25:0.5;var t=Math.min(J,1/u);if(d>t){var j=(d-t)/(1-t);var H=TSUSineMap(Math.min(1,2*j));H*=this.parentOpacity*f.initialState.opacity;var D=this.drawableObjects[K];D.Opacity=H;D.drawFrame()}var w=this.framebufferDrawableObjects[K];var F=w.drawableFrame;var A=w.frameRect;var k={x:f.offset.pointX-A.origin.x,y:f.offset.pointY+e-(A.origin.y+A.size.height)};var I=F.origin.y-A.origin.y;var M=A.origin.y+A.size.height-(F.origin.y+F.size.height);k.y+=(M-I);var G=this.p_orthoTransformWithScale(1,k,A);m.viewport(0,0,A.size.width,A.size.height);m.bindFramebuffer(m.FRAMEBUFFER,w.buffer);m.clear(m.COLOR_BUFFER_BIT);m.enable(m.BLEND);m.blendFunc(m.SRC_ALPHA,m.ONE);var q=(l==0||l==1?0:1);m.bindTexture(m.TEXTURE_2D,w.texture);var s=this.flameSystems[K];s.setMVPMatrix(G);m.uniform1f(n.SpeedMax,s._speedMax);s.drawFrame(l,q);m.bindFramebuffer(m.FRAMEBUFFER,null);m.bindTexture(m.TEXTURE_2D,null);m.viewport(0,0,m.viewportWidth,m.viewportHeight);m.blendFunc(m.ONE,m.ONE_MINUS_SRC_ALPHA);w.MVPMatrix=WebGraphics.translateMatrix4(x.slideProjectionMatrix,A.origin.x,m.viewportHeight-(A.origin.y+A.size.height),0);w.drawFrame()}else{if(!f.initialState.hidden){this.drawableObjects[K].Opacity=this.parentOpacity*f.initialState.opacity;this.drawableObjects[K].drawFrame()}}}}}});var KNWebGLTransitionConfetti=Class.create(KNWebGLProgram,{initialize:function($super,a,b){this.programData={name:"com.apple.iWork.Keynote.KLNConfetti",programNames:["confetti","defaultTexture"],effect:b.effect,textures:b.textures};$super(a,this.programData);this.useGravity=this.direction===KNDirection.kKNDirectionGravity?true:false;this.percentfinished=0;this.animationWillBeginWithContext()},animationWillBeginWithContext:function(){var j=this.renderer;var g=this.gl;var k=this.textures;var d=k[0];var b=d.width;var l=d.height;var i=g.viewportWidth;var h=g.viewportHeight;var f=10000;g.blendFunc(g.SRC_ALPHA,g.ONE_MINUS_SRC_ALPHA);this.confettiSystem=new KNWebGLBuildConfettiSystem(j,this.program.confetti,{width:b,height:l},{width:i,height:h},this.duration,f,k[1].texture);this.confettiSystem.setMVPMatrix(j.slideProjectionMatrix);var e=this.program.defaultTexture;KNWebGLUtil.enableAttribs(g,e);var c=[0,0,0,1,1,0,1,1,];var a=[0,0,-1,0,h,-1,i,0,-1,i,h,-1,];this.textureCoordinatesBuffer=g.createBuffer();g.bindBuffer(g.ARRAY_BUFFER,this.textureCoordinatesBuffer);g.bufferData(g.ARRAY_BUFFER,new Float32Array(c),g.STATIC_DRAW);g.vertexAttribPointer(e.attribs.TexCoord,2,g.FLOAT,false,0,0);this.positionBuffer=g.createBuffer();KNWebGLUtil.bindDynamicBufferWithData(g,e.attribs.Position,this.positionBuffer,a,3);g.uniformMatrix4fv(e.uniforms.MVPMatrix,false,j.slideOrthoMatrix);g.activeTexture(g.TEXTURE0);g.uniform1i(e.uniforms.Texture,0);this.drawFrame(0,0,4)},drawFrame:function(b,p,e){var g=this.gl;var j=g.viewportWidth;var h=g.viewportHeight;var a=this.percentfinished;a+=b/e;if(a>1){a=1;this.isCompleted=true}var l=this.percentfinished=a;var i=1-l;var k=1-i*i*i;k=k*(1-l*l)+(1-i*i)*(l*l)+l;k*=0.5;k*=k;var d=0.75+(1-Math.pow(i,4))*0.25;var n=WebGraphics.translateMatrix4(this.renderer.slideProjectionMatrix,j/2,h/2,0);n=WebGraphics.scaleMatrix4(n,d,d,1);n=WebGraphics.translateMatrix4(n,-j/2,-h/2,0);var f=this.program.defaultTexture;g.useProgram(f.shaderProgram);g.uniformMatrix4fv(f.uniforms.MVPMatrix,false,n);this.draw();var o=1-l;o=WebGraphics.clamp(o,0,1);k=WebGraphics.clamp(k,0,1);if(this.useGravity){var m=1;var c=this.renderer.slideProjectionMatrix;c=WebGraphics.translateMatrix4(c,0,-h*2*l*l*(1-m*0.5),0);this.confettiSystem.setMVPMatrix(c)}this.confettiSystem.drawFrame(k,o)},draw:function(){var g=this.gl;var d=this.program.defaultTexture;var f=d.attribs;var b=g.viewportWidth;var c=g.viewportHeight;g.useProgram(d.shaderProgram);var a=[0,0,0,1,1,0,1,1,];var e=[0,0,-1,0,c,-1,b,0,-1,b,c,-1,];g.bindBuffer(g.ARRAY_BUFFER,this.textureCoordinatesBuffer);g.bufferData(g.ARRAY_BUFFER,new Float32Array(a),g.STATIC_DRAW);g.vertexAttribPointer(f.TexCoord,2,g.FLOAT,false,0,0);KNWebGLUtil.bindDynamicBufferWithData(g,f.Position,this.positionBuffer,e,3);g.bindTexture(g.TEXTURE_2D,this.textures[0].texture);g.drawArrays(g.TRIANGLE_STRIP,0,4)}});var KNWebGLBuildConfetti=Class.create(KNWebGLProgram,{initialize:function($super,f,b){var h=b.effect;this.programData={name:"com.apple.iWork.Keynote.KLNConfetti",programNames:["confetti"],effect:h,textures:b.textures};$super(f,this.programData);this.useGravity=this.direction===KNDirection.kKNDirectionGravity?true:false;this.percentfinished=0;this.drawableObjects=[];for(var c=0,a=this.textures.length;c<a;c++){var g=b.textures[c];var e={effect:h,textures:[g]};var d=new KNWebGLDrawable(f,e);this.drawableObjects.push(d)}this.parentOpacity=h.baseLayer.initialState.opacity;this.animationWillBeginWithContext()},animationWillBeginWithContext:function(){var l=this.renderer;var g=this.gl;var j=g.viewportWidth;var h=g.viewportHeight;this.confettiSystems=[];for(var e=0,b=this.textures.length;e<b;e++){var d=this.textures[e];var a=d.width;var m=d.height;var k=(m/h*a/j);k=Math.sqrt(Math.sqrt(k));var f=Math.round(k*10000);var c=new KNWebGLBuildConfettiSystem(l,this.program.confetti,{width:a,height:m},{width:j,height:h},this.duration,f,d.texture);c.ratio=k;this.confettiSystems.push(c)}},drawFrame:function(C,c,a){var v=this.renderer;var x=this.gl;var w=x.viewportWidth;var d=x.viewportHeight;var g=this.buildIn;var B=this.buildOut;var t=this.percentfinished;t+=C/a;if(t>1){t=1;this.isCompleted=true}this.percentfinished=t;for(var z=0,f=this.textures.length;z<f;z++){var r=this.textures[z];var A=r.initialState;var n=r.animations;if(r.hasHighlightedBulletAnimation){if(!A.hidden){var e;if(n.length>0&&n[0].property==="opacity"){var k=n[0].from.scalar;var m=n[0].to.scalar;var q=m-k;e=k+q*t}else{e=r.initialState.opacity}x.blendFunc(x.ONE,x.ONE_MINUS_SRC_ALPHA);this.drawableObjects[z].Opacity=this.parentOpacity*e;this.drawableObjects[z].drawFrame()}}else{if(r.animations.length>0){if(this.isCompleted){if(g){this.drawableObjects[z].Opacity=this.parentOpacity*r.initialState.opacity;this.drawableObjects[z].drawFrame()}continue}var u=r.width;var s=r.height;var b=g?1-t:t;var j=1-b;var p=1-j*j*j;p=p*(1-b*b)+(1-j*j)*(b*b)+b;p*=0.5;if(g){p*=p}var h=this.confettiSystems[z];var D=WebGraphics.translateMatrix4(v.slideProjectionMatrix,r.offset.pointX,d-(r.offset.pointY+s),0);var o=1-b;o=WebGraphics.clamp(o,0,1);p=WebGraphics.clamp(p,0,1);if(this.useGravity){var l=h.ratio;D=WebGraphics.translateMatrix4(D,0,-d*2*b*b*(1-l*0.5),0)}x.blendFunc(x.SRC_ALPHA,x.ONE_MINUS_SRC_ALPHA);h.setMVPMatrix(D);h.drawFrame(p,o)}else{if(!r.initialState.hidden){x.blendFunc(x.ONE,x.ONE_MINUS_SRC_ALPHA);this.drawableObjects[z].Opacity=this.parentOpacity*r.initialState.opacity;this.drawableObjects[z].drawFrame()}}}}}});var KNWebGLBuildDiffuse=Class.create(KNWebGLProgram,{initialize:function($super,f,b){var h=b.effect;this.programData={name:"com.apple.iWork.Keynote.KLNDiffuse",programNames:["diffuse"],effect:h,textures:b.textures};$super(f,this.programData);this.percentfinished=0;this.drawableObjects=[];for(var c=0,a=this.textures.length;c<a;c++){var g=b.textures[c];var e={effect:h,textures:[g]};var d=new KNWebGLDrawable(f,e);this.drawableObjects.push(d)}this.parentOpacity=h.baseLayer.initialState.opacity;this.animationWillBeginWithContext()},animationWillBeginWithContext:function(){var l=this.renderer;var g=this.gl;var j=g.viewportWidth;var h=g.viewportHeight;this.diffuseSystems=[];for(var e=0,b=this.textures.length;e<b;e++){var d=this.textures[e];var a=d.width;var m=d.height;var k=(m/h*a/j);k=Math.sqrt(Math.sqrt(k));var f=Math.round(k*4000);var c=new KNWebGLBuildDiffuseSystem(l,this.program.diffuse,{width:a,height:m},{width:j,height:h},this.duration,f,d.texture,this.direction===KNDirection.kKNDirectionRightToLeft);this.diffuseSystems.push(c)}},drawFrame:function(v,b,a){var o=this.renderer;var q=this.gl;var p=q.viewportWidth;var c=q.viewportHeight;var m=this.percentfinished;m+=v/a;if(m>1){m=1;this.isCompleted=true}this.percentfinished=m;q.blendFunc(q.ONE,q.ONE_MINUS_SRC_ALPHA);for(var r=0,e=this.textures.length;r<e;r++){var k=this.textures[r];var s=k.initialState;var h=k.animations;if(k.hasHighlightedBulletAnimation){if(!s.hidden){var d;if(h.length>0&&h[0].property==="opacity"){var f=h[0].from.scalar;var g=h[0].to.scalar;var j=g-f;d=f+j*m}else{d=k.initialState.opacity}this.drawableObjects[r].Opacity=this.parentOpacity*d;this.drawableObjects[r].drawFrame()}}else{if(k.animations.length>0){var n=k.width;var l=k.height;var u=k.offset.pointX;var t=k.offset.pointY;var w=this.diffuseSystems[r];var x=WebGraphics.translateMatrix4(o.slideProjectionMatrix,u,c-(t+l),0);w.setMVPMatrix(x);w.drawFrame(this.percentfinished,1)}else{if(!k.initialState.hidden){this.drawableObjects[r].Opacity=this.parentOpacity*k.initialState.opacity;this.drawableObjects[r].drawFrame()}}}}}});var KNWebGLBuildFireworks=Class.create(KNWebGLProgram,{initialize:function($super,g,b){this.programData={name:"com.apple.iWork.Keynote.KNFireworks",programNames:["fireworks"],effect:b.effect,textures:b.textures};$super(g,this.programData);var d=this.gl;this.animParameterGroup=new KNAnimParameterGroup("Fireworks");this.fireworksTexture=KNWebGLUtil.bindTextureWithImage(d,fireworksImage);this.fireworksCenterBurstTexture=KNWebGLUtil.bindTextureWithImage(d,fireworksCenterBurstImage);this.percentfinished=0;this.prevpercentfinished=0;this.drawableObjects=[];this.frameRect=this.frameOfEffectWithFrame();this.slideSize={width:d.viewportWidth,height:d.viewportHeight};var j=this.effect;for(var c=0,a=this.textures.length;c<a;c++){var h=b.textures[c];var f={effect:j,textures:[h]};var e=new KNWebGLDrawable(g,f);this.drawableObjects.push(e)}this.parentOpacity=j.baseLayer.initialState.opacity;this.animationWillBeginWithContext()},frameOfEffectWithFrame:function(){var b=this.gl;var a={origin:{x:0,y:0},size:{width:b.viewportWidth,height:b.viewportHeight}};return a},p_orthoTransformWithScale:function(f,e,d){var c={width:d.size.width*f,height:d.size.height*f};var b=WebGraphics.makeOrthoMatrix4(0,c.width,0,c.height,-1,1);var a=WebGraphics.translateMatrix4(b,e.x,-e.y,0);return a},p_setupFBOWithSize:function(a){this.framebuffer=new TSDGLFrameBuffer(this.gl,a,2)},p_fireworksSystemsForTR:function(h){var k=this.renderer;var o=this.gl;var l=o.viewportWidth;var b=o.viewportHeight;var a=this.duration/1000;var s=this.animParameterGroup;var g=a*s.doubleForKey("FireworksCount");g=Math.max(2,g);var c=[];var t=0;var q=1;var m=parseInt(WebGraphics.randomBetween(0,g-1));for(var p=0;p<g;p++){var r=s.doubleForKey("ParticleCount");var e=Math.min(l,b);var n=e*WebGraphics.doubleBetween(s.doubleForKey("FireworkSizeMin"),s.doubleForKey("FireworkSizeMax"));var d=new KNWebGLBuildFireworksSystem(k,this.program.fireworks,{width:h.width,height:h.height},{width:l,height:b},this.duration,{width:r,height:1},{width:1,height:1},this.fireworksTexture);var f=WebGraphics.makeSize(s.doubleForKey("ParticleSizeMin"),s.doubleForKey("ParticleSizeMax"));f.width=f.width*e/100;f.height=f.height*e/100;d.randomParticleSizeMinMax=f;d.maxDistance=n;d.colorRandomness=s.doubleForKey("ParticleColorRandomness");d.lifeSpanMinDuration=s.doubleForKey("ParticleLifeSpanMinDuration");d.randomParticleSpeedMinMax=WebGraphics.makePoint(s.doubleForKey("FireworkSpeedMin"),s.doubleForKey("FireworkSpeedMax"));if(p%2===0){d.fireworkStartingPositionX=WebGraphics.randomBetween(0,0.5)}else{if(p%2===1){d.fireworkStartingPositionX=WebGraphics.randomBetween(0.5,1)}}if(p===t){d.fireworkStartingPositionX=0}if(p===q){d.fireworkStartingPositionX=1}var u=WebGraphics.randomBetween(s.doubleForKey("FireworkDurationMin"),s.doubleForKey("FireworkDurationMax"));u/=a;var j=WebGraphics.randomBetween(0,1-u);if(p===m){j=0}j=Math.max(j,0.001);d.lifeSpan={start:j,duration:u};d.setupWithTexture(h);c.push(d)}return c},animationWillBeginWithContext:function(){var p=this.renderer;var t=this.gl;var w=this.animParameterGroup;var z=CGRectMake(0,0,512,512);var B=CGRectMake(0,0,this.slideSize.width,this.slideSize.height);var s=CGRectMake(0,0,1,1);var m=CGSizeMake(2,2);var x=this.frameRect;this.fireworksSystems=[];for(var u=0,d=this.textures.length;u<d;u++){var n=this.textures[u];var q={x:n.offset.pointX-x.origin.x,y:n.offset.pointY+n.height-(x.origin.y+x.size.height)};var l=WebGraphics.makeOrthoMatrix4(0,x.size.width,0,x.size.height,-1,1);var k=WebGraphics.translateMatrix4(l,q.x,-q.y,0);var g=new TSDGLShader(t);g.initWithDefaultTextureAndOpacityShader();g.setMat4WithTransform3D(k,kTSDGLShaderUniformMVPMatrix);g.setGLint(0,kTSDGLShaderUniformTexture);var o=n.textureRect;var j=CGRectMake(0,0,o.size.width,o.size.height);var h=new TSDGLDataBuffer(t);h.initWithVertexRect(j,TSDRectUnit,m,false,false);var a=p.slideProjectionMatrix;a=WebGraphics.translateMatrix4(a,q.x,-q.y,0);var A=this.p_fireworksSystemsForTR(n);this.p_setupFBOWithSize(x.size);var f=this.fboShader=new TSDGLShader(t);f.initWithShaderFileNames("fireworkstrails","fireworkstrails");f.setMat4WithTransform3D(l,kTSDGLShaderUniformMVPMatrix);f.setGLint(0,kTSDGLShaderUniformTexture);var b=this.fboDataBuffer=new TSDGLDataBuffer(t);b.initWithVertexRect(CGRectMake(0,0,x.size.width,x.size.height),TSDRectUnit,m,false,false);var c=this.centerBurstShader=new TSDGLShader(t);c.initWithDefaultTextureAndOpacityShader();c.setGLFloat(1,kTSDGLShaderUniformOpacity);var e=this.centerBurstDataBuffer=new TSDGLDataBuffer(t);e.initWithVertexRect(z,TSDRectUnit,m,false,false);var r=this._bloomEffect=new TSDGLBloomEffect(t);r.initWithEffectSize(x.size,w.doubleForKey("BloomBlurScale"));var v={_baseOrthoTransform:l,_baseTransform:k,objectShader:g,objectDataBuffer:h,fireworksMVP:a,systems:A};this.fireworksSystems.push(v);t.clearColor(0,0,0,0);t.enable(t.BLEND);t.blendFunc(t.ONE,t.ONE_MINUS_SRC_ALPHA);t.disable(t.DEPTH_TEST)}},drawFrame:function(a,j,z){var C=this.renderer;var p=this.gl;var c=this.program.fireworks;var q=c.uniforms;var h=this.buildOut;var m=this.percentfinished;var w=this.animParameterGroup;var F=w.doubleForKey("ParticleTrailsDitherAmount");var n=w.doubleForKey("ParticleTrailsDitherMax");var f=w.doubleForKey("BloomPower");m+=a/z;if(m>=1){m=1;this.isCompleted=true}this.percentfinished=m;p.blendFunc(p.ONE,p.ONE_MINUS_SRC_ALPHA);for(var R=0,s=this.textures.length;R<s;R++){var g=this.textures[R];var M=g.initialState;var V=g.animations;if(g.hasHighlightedBulletAnimation){if(!M.hidden){var S;if(V.length>0&&V[0].property==="opacity"){var W=V[0].from.scalar;var D=V[0].to.scalar;var A=D-W;S=W+A*this.percentfinished}else{S=g.initialState.opacity}this.drawableObjects[R].Opacity=this.parentOpacity*S;this.drawableObjects[R].drawFrame()}}else{if(g.animations.length>0){if(this.isCompleted){if(!h){this.drawableObjects[R].Opacity=this.parentOpacity*g.initialState.opacity;this.drawableObjects[R].drawFrame()}continue}var b=g.width;var e=g.height;var J=g.offset.pointX;var H=g.offset.pointY;var u=p.viewportWidth;var r=p.viewportHeight;z/=1000;var d=m;var K=TSDGLFrameBuffer.currentGLFramebuffer(p);var U=this.fireworksSystems[R];var l=U.objectShader;var t=U.objectDataBuffer;this.p_drawObject(d,g,l,t);var N=this.framebuffer;var O=this.fboShader;var x=this.fboDataBuffer;var T=N.currentGLTexture();N.setCurrentTextureToNext();N.bindFramebuffer();p.clear(p.COLOR_BUFFER_BIT);p.viewport(0,0,N.size.width,N.size.height);p.bindTexture(p.TEXTURE_2D,T);var o=w.doubleForKey("FireworkDurationMin")/z;o=Math.min(o/2,1);var I=WebGraphics.clamp((m-o)/(1-o),0,1);var B=1-WebGraphics.mix(w.doubleForKey("TrailsFadeOutMin"),w.doubleForKey("TrailsFadeOutMax"),Math.pow(I,2));O.setGLFloat(B,kTSDGLShaderUniformOpacity);O.setGLFloat(F,kShaderUniformNoiseAmount);O.setGLFloat(n,kShaderUniformNoiseMax);var Q=WebGraphics.makePoint(WebGraphics.randomBetween(0,1),WebGraphics.randomBetween(0,1));O.setPoint2D(Q,kShaderUniformNoiseSeed);x.drawWithShader(this.fboShader,true);p.blendFunc(p.ONE,p.ONE_MINUS_SRC_ALPHA);p.useProgram(c.shaderProgram);var G=w.doubleForKey("Gravity");G*=Math.min(u,r)*0.001;G*=z;p.uniform1f(q.Gravity,G);var E=Math.min(u,r);var v=E*w.doubleForKey("ParticleSizeStart")/100;p.uniform1f(q.StartScale,v);p.uniform1f(q.SparklePeriod,w.doubleForKey("SparklePeriod"));this.drawParticleSystemsWithPercent(m,false,1,U);p.viewport(0,0,p.viewportWidth,p.viewportHeight);N.unbindFramebufferAndBindGLFramebuffer(K);var P=w.doubleForKey("FireworkDurationMax");P=Math.min(P,0.999);var L=WebGraphics.clamp((m-P)/(1-P),0,1);var k=1-w.doubleForAnimationCurve("ParticleTransparency",L);this._bloomEffect.bindFramebuffer();p.clear(p.COLOR_BUFFER_BIT);O.setGLFloat(k,kTSDGLShaderUniformOpacity);O.setGLFloat(0,kShaderUniformNoiseAmount);p.blendFunc(p.SRC_ALPHA,p.ONE_MINUS_SRC_ALPHA);p.bindTexture(p.TEXTURE_2D,N.currentGLTexture());x.drawWithShader(O,true);p.blendFunc(p.ONE,p.ONE_MINUS_SRC_ALPHA);p.useProgram(c.shaderProgram);this.drawParticleSystemsWithPercent(m,true,k,U);this._bloomEffect.unbindFramebufferAndBindGLFramebuffer(K);p.blendFunc(p.ONE,p.ONE);this._bloomEffect.drawBloomEffectWithMVPMatrix(U._baseOrthoTransform,f,K);p.blendFunc(p.ONE,p.ONE_MINUS_SRC_ALPHA)}else{if(!g.initialState.hidden){this.drawableObjects[R].Opacity=this.parentOpacity*g.initialState.opacity;this.drawableObjects[R].drawFrame()}}}}this.prevpercentfinished=this.percentfinished},p_drawObject:function(h,c,i,a){var e=this.gl;var b=this.animParameterGroup;var d=b.doubleForKey("TextOpacityBeginTime");var f=b.doubleForKey("TextOpacityEndTime");h=WebGraphics.clamp((h-d)/(f-d),0,1);var g=this.parentOpacity*c.initialState.opacity;g*=b.doubleForAnimationCurve("TextOpacityTiming",h);i.setGLFloat(g,kTSDGLShaderUniformOpacity);e.blendFunc(e.ONE,e.ONE_MINUS_SRC_ALPHA);e.bindTexture(e.TEXTURE_2D,c.texture);a.drawWithShader(i,true)},drawParticleSystemsWithPercent:function(a,v,l,u){var p=this.renderer;var q=this.gl;var h=this.program.fireworks;var w=h.uniforms;var z=this.animParameterGroup;var e=u.systems;var n=u._baseTransform;var B=u.fireworksMVP;q.useProgram(h.shaderProgram);q.uniform1f(w.ShouldSparkle,v?1:0);for(var r=0,d=e.length;r<d;r++){var g=e[r];var j=g.lifeSpan;var f=(a-j.start)/j.duration;if(f<=0||f>=1){continue}var f=WebGraphics.clamp(f,0,1);var c=(this.prevpercentfinished-j.start)/j.duration;c=WebGraphics.clamp(c,f/2,1);var b=l;if(v){b=1-z.doubleForAnimationCurve("ParticleTransparency",f)}var s=z.doubleForAnimationCurve("ParticleBurstTiming",c);var k=z.doubleForAnimationCurve("ParticleBurstTiming",f);q.uniform1f(w.ParticleBurstTiming,k);q.uniform1f(w.PreviousParticleBurstTiming,s);q.uniform1f(w.PreviousPercent,c);if(!v){if(!g.didDrawCenterBurst){q.bindTexture(q.TEXTURE_2D,this.fireworksCenterBurstTexture);var A=q.viewportHeight/512;A*=WebGraphics.randomBetween(z.doubleForKey("CenterBurstScaleMin"),z.doubleForKey("CenterBurstScaleMax"));var x=g._startingPoint;var m=WebGraphics.translateMatrix4(n,x.x,x.y,0);var o=WebGraphics.makePoint(-(512/2*A),-(512/2*A));m=WebGraphics.translateMatrix4(m,o.x,o.y,0);m=WebGraphics.scaleMatrix4(m,A,A,1);this.centerBurstShader.setGLFloat(z.doubleForKey("CenterBurstOpacity"),kTSDGLShaderUniformOpacity);this.centerBurstShader.setMat4WithTransform3D(m,kTSDGLShaderUniformMVPMatrix);q.blendFunc(q.SRC_ALPHA,q.ONE_MINUS_SRC_ALPHA);this.centerBurstDataBuffer.drawWithShader(this.centerBurstShader,true);q.blendFunc(q.ONE,q.ONE_MINUS_SRC_ALPHA);g.didDrawCenterBurst=true}}q.useProgram(h.shaderProgram);g.setMVPMatrix(B);g.drawFrame(f,b)}}});
+/*
+ * KNWebGLObjects.js
+ * Keynote HTML Player
+ *
+ * Created by Tungwei Cheng
+ * Copyright (c) 2016-2018 Apple Inc. All rights reserved.
+ */
+
+var kShaderUniformGravity = "Gravity";
+var kShaderUniformMaskTexture = "MaskTexture";
+var kShaderUniformNoiseAmount = "NoiseAmount";
+var kShaderUniformNoiseMax = "NoiseMax";
+var kShaderUniformNoiseSeed = "NoiseSeed";
+var kShaderUniformParticleBurstTiming = "ParticleBurstTiming";
+var kShaderUniformPreviousParticleBurstTiming = "PreviousParticleBurstTiming";
+var kShaderUniformPreviousPercent = "PreviousPercent";
+var kShaderUniformShouldSparkle = "ShouldSparkle";
+var kShaderUniformSparklePeriod = "SparklePeriod";
+var kShaderUniformSparkleStartTime = "SparkleStartTime";
+var kShaderUniformStartScale = "StartScale";
+
+var kShimmerUniformParticleScalePercent = "ParticleScalePercent";
+var kShimmerUniformRotationMatrix = "RotationMatrix";
+
+var KNSparkleMaxParticleLife = 0.667;
+
+var KNWebGLRenderer = Class.create({
+    initialize: function(params) {
+        var canvas = this.canvas = params.canvas;
+        this.canvasId = params.canvasId;
+        this.textureAssets = params.textureAssets;
+        this.durationMax = params.overallEndTime * 1000;
+        this.glPrograms = [];
+
+        // to be used in request animation frame
+        this.elapsed = 0;
+
+        // attempt to create webgl context
+        var gl = this.gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+
+        // if webgl is not supported then set noGL to true
+        if (!gl) {
+            this.noGL = true;
+            return;
+        }
+
+        // indicate if the animation has started for this renderer
+        this.animationStarted = false;
+
+        gl.viewportWidth = canvas.width;
+        gl.viewportHeight = canvas.height;
+
+        // create default project matrix
+        this.initMVPMatrix();
+    },
+
+    initMVPMatrix: function() {
+        var gl = this.gl;
+        var w = gl.viewportWidth;
+        var h = gl.viewportHeight;
+        var fovradians = 20 * (Math.PI / 180);
+        var backupDistance = h / (2 * Math.tan(fovradians / 2));
+        var frontclipping = backupDistance - (w * 1.5);
+        var backclipping = backupDistance + (w * 15.0);
+
+        // create default ortho and proj matrices
+        this.slideProjectionMatrix = WebGraphics.makePerspectiveMatrix4(20, w / h, Math.max(1, frontclipping), backclipping);
+
+        var translate = WebGraphics.translateMatrix4(WebGraphics.createMatrix4(), -w / 2, -h / 2, -backupDistance);
+
+        this.slideProjectionMatrix = WebGraphics.multiplyMatrix4(this.slideProjectionMatrix, translate);
+        this.slideOrthoMatrix = WebGraphics.makeOrthoMatrix4(0, w, 0, h, -1, 1);
+    },
+
+    setupTexture: function(effect) {
+        var textures = [];
+        this.textureInfoFromEffect(effect.kpfLayer, {"pointX": 0, "pointY": 0}, textures);
+
+        for (var i = 0, length = textures.length; i < length; i++) {
+            var textureId = textures[i].textureId;
+            var image = this.textureAssets[textureId];
+
+            textures[i].texture = KNWebGLUtil.createTexture(this.gl, image);
+        }
+
+        return textures;
+    },
+
+    textureInfoFromEffect: function(kpfLayer, offset, textures) {
+        var textureInfo = {};
+
+        textureInfo.offset = {
+            "pointX": offset.pointX + kpfLayer.bounds.offset.pointX,
+            "pointY": offset.pointY + kpfLayer.bounds.offset.pointY
+        };
+
+        if (kpfLayer.textureId) {
+            textureInfo.textureId = kpfLayer.textureId;
+            textureInfo.width = kpfLayer.bounds.width;
+            textureInfo.height = kpfLayer.bounds.height;
+            textureInfo.initialState = kpfLayer.initialState;
+            textureInfo.animations = kpfLayer.animations;
+            textureInfo.hasHighlightedBulletAnimation = kpfLayer.hasHighlightedBulletAnimation;
+
+            textureInfo.textureRect = {
+                origin: {
+                    x: textureInfo.offset.pointX,
+                    y: textureInfo.offset.pointY
+                },
+                size: {
+                    width: textureInfo.width,
+                    height: textureInfo.height
+                }
+            };
+
+            textures.push(textureInfo);
+        } else {
+            for (var i = 0, length = kpfLayer.layers.length; i < length; i++) {
+                this.textureInfoFromEffect(kpfLayer.layers[i], textureInfo.offset, textures);
+            }
+        }
+    },
+
+    draw: function(effect) {
+        var params = {
+            effect: effect,
+            textures: this.setupTexture(effect)
+        };
+
+        var effectType = effect.type;
+        var program;
+
+        if (effectType === "transition") {
+            switch (effect.name) {
+                case "apple:wipe-iris":
+                    program = new KNWebGLTransitionIris(this, params);
+                    break;
+
+                case "com.apple.iWork.Keynote.BUKTwist":
+                    program = new KNWebGLTransitionTwist(this, params);
+                    break;
+
+                case "com.apple.iWork.Keynote.KLNColorPlanes":
+                    program = new KNWebGLTransitionColorPlanes(this, params);
+                    break;
+
+                case "com.apple.iWork.Keynote.BUKFlop":
+                    program = new KNWebGLTransitionFlop(this, params);
+                    break;
+
+                case "com.apple.iWork.Keynote.KLNConfetti":
+                    program = new KNWebGLTransitionConfetti(this, params);
+                    break;
+
+                default:
+                    // fallback to dissolve
+                    program = new KNWebGLDissolve(this, params);
+                    break;
+            }
+        } else if (effectType === "buildIn" || effectType === "buildOut") {
+            switch (effect.name) {
+                case "apple:wipe-iris":
+                    program = new KNWebGLBuildIris(this, params);
+                    break;
+
+                case "com.apple.iWork.Keynote.BUKAnvil":
+                    program = new KNWebGLBuildAnvil(this, params);
+                    break;
+
+                case "com.apple.iWork.Keynote.KLNFlame":
+                    program = new KNWebGLBuildFlame(this, params);
+                    break;
+
+                case "com.apple.iWork.Keynote.KNFireworks":
+                    program = new KNWebGLBuildFireworks(this, params);
+                    break;
+
+                case "com.apple.iWork.Keynote.KLNConfetti":
+                    program = new KNWebGLBuildConfetti(this, params);
+                    break;
+
+                case "com.apple.iWork.Keynote.KLNDiffuse":
+                    program = new KNWebGLBuildDiffuse(this, params);
+                    break;
+
+                case "com.apple.iWork.Keynote.KLNShimmer":
+                    program = new KNWebGLBuildShimmer(this, params);
+                    break;
+
+                case "com.apple.iWork.Keynote.KLNSparkle":
+                    program = new KNWebGLBuildSparkle(this, params);
+                    break;
+
+                default:
+                    // fallback to dissolve
+                    program = new KNWebGLDissolve(this, params);
+                    break;
+            }
+        } else if (effectType === "smartBuild") {
+            switch (effect.name) {
+                case "apple:gallery-dissolve":
+                    program = new KNWebGLContents(this, params);
+                    break;
+
+                default:
+                    // fallback to dissolve
+                    program = new KNWebGLDissolve(this, params);
+                    break;
+            }
+        }
+
+        // remove existing gl program for the same object when new program is rendered such as build in by highlighted paragraph
+        this.removeProgram(effect.objectID);
+
+        // push new gl program into the array
+        this.glPrograms.push(program);
+    },
+
+    animate: function() {
+        // compute time difference
+        var time = new Date();
+        var difference = 0;
+        if (this.time) {
+            var mseconds = time.getTime();
+            difference = mseconds - this.time;
+            this.time = mseconds;
+        } else {
+            difference = 0;
+            this.time = time.getTime();
+        }
+        this.elapsed += difference;
+
+        var glPrograms = this.glPrograms;
+        var length = glPrograms.length;
+
+        if (this.elapsed <= this.durationMax) {
+            // set up the frame for the next drawing operation, only if there is time left in the animation
+            this.animationRequest = window.requestAnimFrame(this.animate.bind(this));
+        } else {
+            // set gl program to isCompleted when there is no overall event time left
+            for (var i = 0; i < length; i++) {
+                var program = glPrograms[i];
+                program.isCompleted = true;
+            }
+        }
+
+        // clear the buffers before animation frame
+        var gl = this.gl;
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        for (var i = 0; i < length; i++) {
+            var program = glPrograms[i];
+            program.drawFrame(difference, this.elapsed, program.duration);
+        }
+    },
+
+    removeProgram: function(objectID) {
+        var glPrograms = this.glPrograms;
+        var glProgramLength = glPrograms.length;
+
+        // remove gl program for the same objectID from the array
+        while (glProgramLength--) {
+            var glProgram = glPrograms[glProgramLength];
+
+            if (glProgram.effect.objectID === objectID) {
+                glPrograms.splice(glProgramLength, 1);
+            }
+        }
+    },
+
+    resize: function(viewport) {
+        var gl = this.gl;
+        var viewportWidth = viewport.width;
+        var viewportHeight = viewport.height;
+
+        if (gl.viewportWidth !== viewportWidth || gl.viewportHeight !== viewportHeight) {
+            gl.viewport(0, 0, viewportWidth, viewportHeight);
+            gl.viewportWidth = viewportWidth;
+            gl.viewportHeight = viewportHeight;
+        }
+    }
+});
+
+var KNWebGLProgram = Class.create({
+    initialize: function(renderer, programData) {
+        // reference to the renderer
+        this.renderer = renderer;
+
+        // reference to gl context
+        this.gl = renderer.gl;
+
+        // specify textures
+        this.textures = programData.textures;
+
+        // reference to the effect object
+        var effect = this.effect = programData.effect;
+
+        // specify the effect type
+        var type = this.type = effect.type;
+
+        // specific the direction from the effect
+        this.direction = effect.attributes ? effect.attributes.direction : null;
+
+        // specify the duration from the effect
+        this.duration = effect.duration * 1000;
+
+        // boolean to indicate if the effect is a build out
+        this.buildOut = type === "buildOut";
+
+        // boolean to indicate if the effect is a build in
+        this.buildIn = type === "buildIn";
+
+        // create a shader program container object
+        this.program = {};
+
+        // indicate if the effect is completed
+        this.isCompleted = false;
+
+        // setup program data
+        if (programData.programNames) {
+            this.setupProgram(programData);
+        }
+    },
+
+    setupProgram: function(programData) {
+        var gl = this.gl;
+
+        for (var i = 0, length = programData.programNames.length; i < length; i++) {
+            var programName = programData.programNames[i];
+
+            this.program[programName] = KNWebGLUtil.setupProgram(gl, programName);
+        }
+
+        // enable blend function
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    }
+});
+
+var KNWebGLContents = Class.create(KNWebGLProgram, {
+    initialize: function($super, renderer, params) {
+        this.programData = {
+            name: "contents",
+            effect: params.effect,
+            textures: params.textures
+        };
+
+        $super(renderer, this.programData);
+
+        // initialize percent finish based on effect type
+        this.percentfinished = 0;
+
+        // setup requirements
+        this.animationWillBeginWithContext();
+    },
+
+    animationWillBeginWithContext: function() {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var textureRect = this.textures[0].textureRect;
+        var vertexRect = CGRectMake(0, 0, textureRect.size.width, textureRect.size.height);
+        var meshSize = CGSizeMake(2, 2);
+
+        // init contents shader and data buffer
+        var contentsShader = this.contentsShader = new TSDGLShader(gl);
+        contentsShader.initWithContentsShader();
+
+        // contents shader set methods
+        contentsShader.setMat4WithTransform3D(renderer.slideProjectionMatrix, kTSDGLShaderUniformMVPMatrix);
+
+        // outgoing Texture
+        contentsShader.setGLint(0, kTSDGLShaderUniformTexture2);
+
+        // incoming Texture
+        contentsShader.setGLint(1, kTSDGLShaderUniformTexture);
+
+        // init contents data buffer
+        var contentsDataBuffer = this.contentsDataBuffer = new TSDGLDataBuffer(gl);
+        contentsDataBuffer.initWithVertexRect(vertexRect, TSDRectUnit, meshSize, false, false);
+    },
+
+    drawFrame: function(difference, elapsed, duration) {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var percentfinished = this.percentfinished;
+
+        percentfinished += difference / duration;
+
+        if (percentfinished >= 1) {
+            percentfinished = 1;
+            this.isCompleted = true;
+        }
+
+        this.percentfinished = percentfinished;
+
+        // draw contents using glsl mix
+        this.p_drawContents(percentfinished);
+    },
+
+    p_drawContents: function(percent) {
+        var gl = this.gl;
+        var textures = this.textures;
+        var incomingTexture = textures[0].texture;
+        var outgoingTexture = textures[1].texture;
+
+        // calculate the mix factor in ease in and ease out fashion
+        var mixFactor = TSUSineMap(percent);
+
+        if (percent >= 1) {
+            mixFactor = 1.0;
+        }
+
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, incomingTexture);
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, outgoingTexture);
+
+        this.contentsShader.setGLFloat(mixFactor, "mixFactor");
+
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+        this.contentsDataBuffer.drawWithShader(this.contentsShader, true);
+    }
+});
+
+var KNWebGLDrawable = Class.create(KNWebGLProgram, {
+    initialize: function($super, renderer, params) {
+        this.programData = {
+            name: "WebDrawable",
+            programNames:["defaultTextureAndOpacity"],
+            effect: params.effect,
+            textures: params.textures
+        };
+
+        $super(renderer, this.programData);
+
+        this.Opacity = 1.0;
+
+        // setup web drawable requirements
+        this.animationWillBeginWithContext();
+    },
+
+    animationWillBeginWithContext: function() {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var program = this.program["defaultTextureAndOpacity"];
+        var uniforms = program.uniforms;
+        var attribs = program.attribs;
+        var textureInfo = this.textures[0];
+
+        gl.useProgram(program.shaderProgram);
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+        // create WebGLBuffer object for texture coordinates
+        var textureCoordinateBuffer = this.textureCoordinateBuffer = gl.createBuffer();
+        var textureCoordinates = this.textureCoordinates = [
+            0.0, 0.0,
+            0.0, 1.0,
+            1.0, 0.0,
+            1.0, 1.0,
+        ];
+
+        // bind WebGLBuffer object to gl.ARRAY_BUFFER target
+        gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordinateBuffer);
+        // send vertex data to this bound buffer
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates), gl.STATIC_DRAW);
+
+        // create WebGLBuffer object for position coordinates
+        var positionBuffer = this.positionBuffer = gl.createBuffer();
+        var boxPosition = this.boxPosition = [
+            0.0, 0.0, 0.0,
+            0.0, textureInfo.height, 0.0,
+            textureInfo.width, 0.0, 0.0,
+            textureInfo.width, textureInfo.height, 0.0
+        ];
+
+        // bind WebGLBuffer object to gl.ARRAY_BUFFER target
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        // send vertex data to this bound buffer
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(boxPosition), gl.STATIC_DRAW);
+
+        // move the MVPMatrix to appropriate offset
+        this.MVPMatrix = WebGraphics.translateMatrix4(renderer.slideProjectionMatrix, textureInfo.offset.pointX, gl.viewportHeight - textureInfo.offset.pointY - textureInfo.height, 0);
+    },
+
+    drawFrame: function() {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var program = this.program["defaultTextureAndOpacity"];
+        var uniforms = program.uniforms;
+        var attribs = program.attribs;
+        var textures = this.textures;
+        var texture = textures[0].texture;
+
+        gl.useProgram(program.shaderProgram);
+
+        // bind WebGLBuffer object to gl.ARRAY_BUFFER target
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.textureCoordinateBuffer);
+        // assigns the WebGLBuffer object currently bound to the gl.ARRAY_BUFFER target to a vertex attribute index
+        gl.vertexAttribPointer(attribs["TexCoord"], 2, gl.FLOAT, false, 0, 0);
+        // call enableVertexAttribArray, otherwise it won't draw
+        gl.enableVertexAttribArray(attribs["TexCoord"]);
+
+        // bind WebGLBuffer object to gl.ARRAY_BUFFER target
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+        // assigns the WebGLBuffer object currently bound to the gl.ARRAY_BUFFER target to a vertex attribute index
+        gl.vertexAttribPointer(attribs["Position"], 3, gl.FLOAT, false, 0, 0);
+        // call enableVertexAttribArray, otherwise it won't draw
+        gl.enableVertexAttribArray(attribs["Position"]);
+
+        // set MVPMatrix
+        gl.uniformMatrix4fv(uniforms["MVPMatrix"], false, this.MVPMatrix);
+
+        // set Opacity
+        gl.uniform1f(uniforms["Opacity"], this.Opacity);
+
+        // set sampler2D Texture in fragment shader to have the value 0, so it matches the texture unit gl.TEXTURE0
+        gl.activeTexture(gl.TEXTURE0);
+        gl.uniform1i(uniforms["Texture"], 0);
+
+        // bind the texture to texture unit gl.TEXTURE0
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+});
+
+var KNWebGLFramebufferDrawable = Class.create(KNWebGLProgram, {
+    initialize: function($super, renderer, params) {
+        var gl = renderer.gl;
+        var frameRect = this.frameRect = params.frameRect;
+        var texture = this.texture = this.createFramebufferTexture(gl, frameRect);
+
+        this.buffer = this.createFramebuffer(gl, texture);
+
+        var textureInfo = {
+            width: frameRect.size.width,
+            height: frameRect.size.height,
+            offset: {pointX: 0, pointY: 0},
+            texture: texture
+        };
+
+        this.programData = {
+            name: "FramebufferDrawable",
+            programNames:["defaultTexture"],
+            effect: params.effect,
+            textures: [textureInfo]
+        };
+
+        $super(renderer, this.programData);
+
+        this.drawableFrame = params.drawableFrame;
+
+        // setup web drawable requirements
+        this.animationWillBeginWithContext();
+    },
+
+    createFramebufferTexture: function(gl, rect) {
+        var texture = gl.createTexture();
+
+        // bind texture
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+
+        // setup texture parameters
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+        // specify the texture size for memory allocation
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, rect.size.width, rect.size.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+
+        // unbind texture
+        gl.bindTexture(gl.TEXTURE_2D, null);
+
+        return texture;
+    },
+
+    createFramebuffer: function(gl, texture) {
+        var buffer = gl.createFramebuffer();
+
+        //bind framebuffer to texture
+        gl.bindFramebuffer(gl.FRAMEBUFFER, buffer);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+
+        return buffer;
+    },
+
+    animationWillBeginWithContext: function() {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var program = this.program["defaultTexture"];
+        var uniforms = program.uniforms;
+        var attribs = program.attribs;
+        var textureInfo = this.textures[0];
+
+        gl.useProgram(program.shaderProgram);
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+        // create WebGLBuffer object for texture coordinates
+        var textureCoordinateBuffer = this.textureCoordinateBuffer = gl.createBuffer();
+        var textureCoordinates = this.textureCoordinates = [
+            0.0, 1.0,
+            0.0, 0.0,
+            1.0, 1.0,
+            1.0, 0.0,
+        ];
+
+        // bind WebGLBuffer object to gl.ARRAY_BUFFER target
+        gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordinateBuffer);
+        // send vertex data to this bound buffer
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates), gl.STATIC_DRAW);
+
+        // create WebGLBuffer object for position coordinates
+        var positionBuffer = this.positionBuffer = gl.createBuffer();
+        var boxPosition = this.boxPosition = [
+            0.0, 0.0, 0.0,
+            0.0, textureInfo.height, 0.0,
+            textureInfo.width, 0.0, 0.0,
+            textureInfo.width, textureInfo.height, 0.0
+        ];
+
+        // bind WebGLBuffer object to gl.ARRAY_BUFFER target
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        // send vertex data to this bound buffer
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(boxPosition), gl.STATIC_DRAW);
+
+        // move the MVPMatrix to appropriate offset
+        this.MVPMatrix = WebGraphics.translateMatrix4(renderer.slideProjectionMatrix, textureInfo.offset.pointX, gl.viewportHeight - textureInfo.offset.pointY - textureInfo.height, 0);
+    },
+
+    drawFrame: function() {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var program = this.program["defaultTexture"];
+        var uniforms = program.uniforms;
+        var attribs = program.attribs;
+        var textures = this.textures;
+        var texture = textures[0].texture;
+
+        gl.useProgram(program.shaderProgram);
+
+        // bind WebGLBuffer object to gl.ARRAY_BUFFER target
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.textureCoordinateBuffer);
+        // assigns the WebGLBuffer object currently bound to the gl.ARRAY_BUFFER target to a vertex attribute index
+        gl.vertexAttribPointer(attribs["TexCoord"], 2, gl.FLOAT, false, 0, 0);
+        // call enableVertexAttribArray, otherwise it won't draw
+        gl.enableVertexAttribArray(attribs["TexCoord"]);
+
+        // bind WebGLBuffer object to gl.ARRAY_BUFFER target
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+        // assigns the WebGLBuffer object currently bound to the gl.ARRAY_BUFFER target to a vertex attribute index
+        gl.vertexAttribPointer(attribs["Position"], 3, gl.FLOAT, false, 0, 0);
+        // call enableVertexAttribArray, otherwise it won't draw
+        gl.enableVertexAttribArray(attribs["Position"]);
+
+        // set MVPMatrix
+        gl.uniformMatrix4fv(uniforms["MVPMatrix"], false, this.MVPMatrix);
+
+        // set sampler2D Texture in fragment shader to have the value 0, so it matches the texture unit gl.TEXTURE0
+        gl.activeTexture(gl.TEXTURE0);
+        gl.uniform1i(uniforms["Texture"], 0);
+
+        // bind the texture to texture unit gl.TEXTURE0
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+});
+
+var KNWebGLDissolve = Class.create(KNWebGLProgram, {
+    initialize: function($super, renderer, params) {
+        this.programData = {
+            name: "dissolve",
+            programNames:["defaultTextureAndOpacity"],
+            effect: params.effect,
+            textures: params.textures
+        };
+
+        $super(renderer, this.programData);
+
+        // initialize percent finish based on effect type
+        this.percentfinished = 0;
+
+        // setup requirements
+        this.animationWillBeginWithContext();
+    },
+
+    animationWillBeginWithContext: function() {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var program = this.program["defaultTextureAndOpacity"];
+        var uniforms = program.uniforms;
+        var attribs = program.attribs;
+        var textureInfo = this.textures[0];
+
+        gl.useProgram(program.shaderProgram);
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+        // create WebGLBuffer object for texture coordinates
+        var textureCoordinateBuffer = this.textureCoordinateBuffer = gl.createBuffer();
+        var textureCoordinates = this.textureCoordinates = [
+            0.0, 0.0,
+            0.0, 1.0,
+            1.0, 0.0,
+            1.0, 1.0,
+        ];
+
+        // bind WebGLBuffer object to gl.ARRAY_BUFFER target
+        gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordinateBuffer);
+        // send vertex data to this bound buffer
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates), gl.STATIC_DRAW);
+
+        // create WebGLBuffer object for position coordinates
+        var positionBuffer = this.positionBuffer = gl.createBuffer();
+        var boxPosition = this.boxPosition = [
+            0.0, 0.0, 0.0,
+            0.0, textureInfo.height, 0.0,
+            textureInfo.width, 0.0, 0.0,
+            textureInfo.width, textureInfo.height, 0.0
+        ];
+
+        // bind WebGLBuffer object to gl.ARRAY_BUFFER target
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        // send vertex data to this bound buffer
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(boxPosition), gl.STATIC_DRAW);
+
+        this.MVPMatrix = WebGraphics.translateMatrix4(renderer.slideProjectionMatrix, textureInfo.offset.pointX,  gl.viewportHeight - (textureInfo.offset.pointY + textureInfo.height), 0);
+
+        this.drawFrame(0, 0, 4);
+    },
+
+    drawFrame: function(difference, elapsed, duration) {
+        var percentfinished = this.percentfinished;
+
+        percentfinished += difference / duration;
+        percentfinished > 1 ? percentfinished = 1 : 0;
+
+        var percentAlpha = TSUSineMap(percentfinished);
+        if (percentfinished === 1) {
+            percentAlpha = 1.0;
+        }
+
+        if (this.buildOut) {
+            percentAlpha = 1 - percentAlpha;
+        }
+
+        this.percentfinished = percentfinished;
+        this.percentAlpha = percentAlpha;
+        this.draw();
+    },
+
+    draw: function() {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var program = this.program["defaultTextureAndOpacity"];
+        var uniforms = program.uniforms;
+        var attribs = program.attribs;
+        var textures = this.textures;
+        var texture = textures[0].texture;
+        var outgoingTexture;
+
+        if (textures.length > 1) {
+            outgoingTexture = textures[1].texture;
+        }
+
+        // use this program
+        gl.useProgram(program.shaderProgram);
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+        // bind WebGLBuffer object to gl.ARRAY_BUFFER target
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.textureCoordinateBuffer);
+        // send vertex data to this bound buffer
+        gl.vertexAttribPointer(attribs["TexCoord"], 2, gl.FLOAT, false, 0, 0);
+        // call enableVertexAttribArray, otherwise it won't draw
+        gl.enableVertexAttribArray(attribs["TexCoord"]);
+
+        // bind WebGLBuffer object to gl.ARRAY_BUFFER target
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+        // send vertex data to this bound buffer
+        gl.vertexAttribPointer(attribs["Position"], 3, gl.FLOAT, false, 0, 0);
+        // call enableVertexAttribArray, otherwise it won't draw
+        gl.enableVertexAttribArray(attribs["Position"]);
+
+        // set MVPMatrix
+        gl.uniformMatrix4fv(uniforms["MVPMatrix"], false, this.MVPMatrix);
+
+        // set sampler2D Texture in fragment shader to have the value 0, so it matches the texture unit gl.TEXTURE0
+        gl.activeTexture(gl.TEXTURE0);
+        gl.uniform1i(uniforms["Texture"], 0);
+
+        // bind the texture to texture unit gl.TEXTURE0
+        if (outgoingTexture) {
+            gl.bindTexture(gl.TEXTURE_2D, outgoingTexture);
+            gl.uniform1f(uniforms["Opacity"], 1.0);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        }
+
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.uniform1f(uniforms["Opacity"], this.percentAlpha);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+});
+
+var KNWebGLTransitionIris = Class.create(KNWebGLProgram, {
+    initialize: function($super, renderer, params) {
+        this.programData = {
+            name: "apple:wipe-iris",
+            programNames: ["iris"],
+            effect: params.effect,
+            textures: params.textures
+        };
+
+        $super(renderer, this.programData);
+
+        // determine the type and direction
+        var direction = this.direction;
+        var directionOut = direction === KNDirection.kKNDirectionOut;
+        var buildOut = this.buildOut;
+
+        if ((buildOut && directionOut) || (!buildOut && !directionOut)) {
+            this.mix = 0.0;
+            this.percentfinished = 1.0;
+        } else {
+            this.mix = 1.0;
+            this.percentfinished = 0.0;
+        }
+
+        this.percentAlpha = 0.0;
+
+        // setup requirements
+        this.animationWillBeginWithContext();
+    },
+
+    animationWillBeginWithContext: function() {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var program = this.program["iris"];
+        var attribs = program.attribs;
+        var uniforms = program.uniforms;
+        var textureInfo = this.textures[0];
+
+        gl.useProgram(program.shaderProgram);
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+        // initial scale uniform
+        this.scale = textureInfo.width/textureInfo.height;
+
+        // create buffers
+        var textureCoordinatesBuffer = this.textureCoordinatesBuffer = gl.createBuffer();
+        var textureCoordinates = this.textureCoordinates = [
+            0.0, 0.0,
+            0.0, 1.0,
+            1.0, 0.0,
+            1.0, 1.0,
+        ];
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordinatesBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates), gl.STATIC_DRAW);
+
+        var positionBuffer = this.positionBuffer = gl.createBuffer();
+        var boxPosition = this.boxPosition = [
+            0.0, 0.0, 0.0,
+            0.0, textureInfo.height, 0.0,
+            textureInfo.width, 0.0, 0.0,
+            textureInfo.width, textureInfo.height, 0.0
+        ];
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(boxPosition), gl.STATIC_DRAW);
+
+        this.MVPMatrix = WebGraphics.translateMatrix4(renderer.slideProjectionMatrix, textureInfo.offset.pointX,  gl.viewportHeight - (textureInfo.offset.pointY + textureInfo.height), 0);
+
+        this.drawFrame(0, 0, 4);
+    },
+
+    drawFrame: function(difference, elapsed, duration) {
+        // determine the type and direction
+        var buildOut = this.buildOut;
+        var directionOut = this.direction === KNDirection.kKNDirectionOut;
+        var percentfinished = this.percentfinished;
+
+        if ((buildOut && directionOut) || (!buildOut && !directionOut)) {
+            percentfinished -= difference / duration;
+            percentfinished < 0 ? percentfinished = 0 : 0;
+        } else {
+            percentfinished += difference / duration;
+            percentfinished > 1 ? percentfinished = 1 : 0;
+        }
+
+        var percentAlpha = TSUSineMap(percentfinished);
+        if (percentfinished === 1) {
+            percentAlpha = 1.0;
+        }
+
+        if (buildOut) {
+            percentAlpha = 1 - percentAlpha;
+        }
+
+        this.percentAlpha = percentAlpha;
+        this.percentfinished = percentfinished;
+        this.draw();
+    },
+
+    draw: function() {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var program = this.program["iris"];
+        var attribs = program.attribs;
+        var uniforms = program.uniforms;
+        var textures = this.textures;
+        var texture = textures[0].texture;
+        var textureInfo = textures[0];
+
+        var outgoingTexture;
+        var scale = this.scale;
+
+        if (textures.length > 1) {
+            outgoingTexture = textures[1].texture;
+        }
+
+        gl.useProgram(program.shaderProgram);
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+        // setup attributes
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.textureCoordinatesBuffer);
+        gl.vertexAttribPointer(attribs["TexCoord"], 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(attribs["TexCoord"]);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+        gl.vertexAttribPointer(attribs["Position"], 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(attribs["Position"]);
+
+        // setup uniforms and textures
+        gl.uniformMatrix4fv(uniforms["MVPMatrix"], false, this.MVPMatrix);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.uniform1i(uniforms["Texture"], 0);
+
+        // set Opacity
+        gl.uniform1f(uniforms["Opacity"], 1);
+
+        // bg texture
+        if (outgoingTexture) {
+            gl.bindTexture(gl.TEXTURE_2D, outgoingTexture);
+            gl.uniform1f(uniforms["PercentForAlpha"], 0.0);
+            gl.uniform1f(uniforms["Scale"], scale);
+            gl.uniform1f(uniforms["Mix"], 0.0);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0 , 4);
+        }
+
+        //fg texture
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.uniform1f(uniforms["PercentForAlpha"], this.percentAlpha);
+        gl.uniform1f(uniforms["Scale"], scale);
+        gl.uniform1f(uniforms["Mix"], this.mix);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0 , 4);
+    }
+});
+
+var KNWebGLBuildIris = Class.create(KNWebGLProgram, {
+    initialize: function($super, renderer, params) {
+        var effect = params.effect;
+
+        this.programData = {
+            name: "apple:wipe-iris",
+            programNames: ["iris"],
+            effect: effect,
+            textures: params.textures
+        };
+
+        $super(renderer, this.programData);
+
+        // determine the type and direction
+        var direction = this.direction;
+        var directionOut = direction === KNDirection.kKNDirectionOut;
+        var buildOut = this.buildOut;
+
+        if ((buildOut && directionOut) || (!buildOut && !directionOut)) {
+            this.mix = 0.0;
+            this.percentfinished = 1.0;
+        } else {
+            this.mix = 1.0;
+            this.percentfinished = 0.0;
+        }
+
+        this.percentAlpha = 0.0;
+
+        // create drawable object for drawing static texture
+        this.drawableObjects = [];
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var texture = params.textures[i];
+            var drawableParams = {
+                effect: effect,
+                textures: [texture]
+            };
+
+            var drawableObject = new KNWebGLDrawable(renderer, drawableParams);
+            this.drawableObjects.push(drawableObject);
+        }
+
+        // set parent opacity from CA baseLayer
+        this.parentOpacity = effect.baseLayer.initialState.opacity;
+
+        // setup requirements
+        this.animationWillBeginWithContext();
+    },
+
+    animationWillBeginWithContext: function() {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var program = this.program["iris"];
+        var attribs = program.attribs;
+        var uniforms = program.uniforms;
+
+        gl.useProgram(program.shaderProgram);
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+        // setup attributes
+        var textureCoordinatesBuffer = gl.createBuffer();
+        var textureCoordinates = [
+            0.0, 0.0,
+            0.0, 1.0,
+            1.0, 0.0,
+            1.0, 1.0,
+        ];
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordinatesBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates), gl.STATIC_DRAW);
+
+        var viewportWidth = gl.viewportWidth;
+        var viewportHeight = gl.viewportHeight;
+
+        this.irisSystems = [];
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var textureInfo = this.textures[i];
+            var width = textureInfo.width;
+            var height = textureInfo.height;
+
+            // initial scale uniform
+            var scale = textureInfo.width/textureInfo.height;
+
+            var positionBuffer = gl.createBuffer();
+            var boxPosition = [
+                0.0, 0.0, 0.0,
+                0.0, textureInfo.height, 0.0,
+                textureInfo.width, 0.0, 0.0,
+                textureInfo.width, textureInfo.height, 0.0
+            ];
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(boxPosition), gl.STATIC_DRAW);
+
+            var MVPMatrix = WebGraphics.translateMatrix4(renderer.slideProjectionMatrix, textureInfo.offset.pointX,  gl.viewportHeight - (textureInfo.offset.pointY + textureInfo.height), 0);
+
+            this.irisSystems[i] = {
+                textureCoordinatesBuffer: textureCoordinatesBuffer,
+                positionBuffer: positionBuffer,
+                MVPMatrix: MVPMatrix,
+                scale: scale
+            };
+        }
+    },
+
+    drawFrame: function(difference, elapsed, duration) {
+        var renderer = this.renderer;
+        var gl = this.gl;
+
+        // determine the type and direction
+        var buildOut = this.buildOut;
+        var directionOut = this.direction === KNDirection.kKNDirectionOut;
+
+        var percentfinished = this.percentfinished;
+
+        if ((buildOut && directionOut) || (!buildOut && !directionOut)) {
+            percentfinished -= difference / duration;
+
+            if (percentfinished <= 0) {
+                percentfinished = 0;
+                this.isCompleted = true;
+            }
+        } else {
+            percentfinished += difference / duration;
+
+            if (percentfinished >= 1) {
+                percentfinished = 1;
+                this.isCompleted = true;
+            }
+        }
+
+        var percentAlpha = TSUSineMap(percentfinished);
+
+        if (percentfinished === 1) {
+            percentAlpha = 1.0;
+        }
+
+        if (buildOut) {
+            percentAlpha = 1 - percentAlpha;
+        }
+
+        this.percentAlpha = percentAlpha;
+        this.percentfinished = percentfinished;
+
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var textureInfo = this.textures[i];
+            var initialState = textureInfo.initialState;
+            var animations = textureInfo.animations;
+
+            if (textureInfo.hasHighlightedBulletAnimation) {
+                if (!initialState.hidden) {
+                    var opacity;
+                    if (animations.length > 0 && animations[0].property === "opacity") {
+                        var opacityFrom = animations[0].from.scalar;
+                        var opacityTo = animations[0].to.scalar;
+                        var diff = opacityTo - opacityFrom;
+                        if (buildOut) {
+                            opacity = opacityFrom + diff * (1 - this.percentfinished);
+                        } else {
+                            opacity = opacityFrom + diff * this.percentfinished;
+                        }
+                    } else {
+                        opacity = textureInfo.initialState.opacity;
+                    }
+
+                    this.drawableObjects[i].Opacity = this.parentOpacity * opacity;
+                    this.drawableObjects[i].drawFrame();
+                }
+            } else if (textureInfo.animations.length > 0) {
+                if (this.isCompleted) {
+                    if (!buildOut) {
+                        // if completed, just draw its texture object for better performance
+                        this.drawableObjects[i].Opacity = this.parentOpacity * textureInfo.initialState.opacity;;
+                        this.drawableObjects[i].drawFrame();
+                    }
+                    continue;
+                }
+
+                var program = this.program["iris"];
+                var attribs = program.attribs;
+                var uniforms = program.uniforms;
+
+                var irisSystem = this.irisSystems[i];
+                var scale = irisSystem.scale;
+
+                gl.useProgram(program.shaderProgram);
+
+                var textureCoordinatesBuffer = irisSystem.textureCoordinatesBuffer;
+                gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordinatesBuffer);
+                gl.vertexAttribPointer(attribs["TexCoord"], 2, gl.FLOAT, false, 0, 0);
+                gl.enableVertexAttribArray(attribs["TexCoord"]);
+
+                var positionBuffer = irisSystem.positionBuffer;
+                gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+                gl.vertexAttribPointer(attribs["Position"], 3, gl.FLOAT, false, 0, 0);
+                gl.enableVertexAttribArray(attribs["Position"]);
+
+                var MVPMatrix = irisSystem.MVPMatrix;
+                gl.uniformMatrix4fv(uniforms["MVPMatrix"], false, MVPMatrix);
+                gl.activeTexture(gl.TEXTURE0);
+                gl.uniform1i(uniforms["Texture"], 0);
+
+                // set Opacity
+                gl.uniform1f(uniforms["Opacity"], this.parentOpacity * textureInfo.initialState.opacity);
+
+                //fg texture
+                gl.bindTexture(gl.TEXTURE_2D, textureInfo.texture);
+                gl.uniform1f(uniforms["PercentForAlpha"], this.percentAlpha);
+                gl.uniform1f(uniforms["Scale"], scale);
+                gl.uniform1f(uniforms["Mix"], this.mix);
+                gl.drawArrays(gl.TRIANGLE_STRIP, 0 , 4);
+            } else {
+                if (!textureInfo.initialState.hidden) {
+                    this.drawableObjects[i].Opacity = this.parentOpacity * textureInfo.initialState.opacity;
+                    this.drawableObjects[i].drawFrame();
+                }
+            }
+        }
+    }
+});
+
+var KNWebGLTransitionTwist = Class.create(KNWebGLProgram, {
+    initialize: function($super, renderer, params) {
+        this.programData = {
+            name: "com.apple.iWork.Keynote.BUKTwist",
+            programNames:["twist"],
+            effect: params.effect,
+            textures: params.textures
+        };
+
+        $super(renderer, this.programData);
+
+        var gl = this.gl;
+        this.direction = this.effect.attributes.direction;
+        this.percentfinished = 0.0;
+
+        var mNumPoints = this.mNumPoints = 24;
+        var dx = gl.viewportWidth / (mNumPoints - 1);
+        var dy = gl.viewportHeight / (mNumPoints - 1);
+        var fractionOfUnitLength = 1 / (mNumPoints - 1);
+        var x, y;
+        var TexCoords = this.TexCoords = [];
+        var PositionCoords = this.PositionCoords = [];
+        var NormalCoords = this.NormalCoords = [];
+        for (y = 0; y < mNumPoints; y++) {
+            for (x = 0; x < mNumPoints; x++) {
+                var index = y * mNumPoints + x;
+                PositionCoords[index * 3] = x * dx;
+                PositionCoords[index * 3 + 1] = y * dy;
+                PositionCoords[index * 3 + 2] = 0;
+                TexCoords.push(x * fractionOfUnitLength);
+                TexCoords.push(y * fractionOfUnitLength);
+                NormalCoords.push(0);
+                NormalCoords.push(0);
+                NormalCoords.push(-1);
+            }
+        }
+
+        var index = 0;
+        var elementArray = this.elementArray = [];
+        for (y = 0; y < mNumPoints - 1; y++) {
+            for (x = 0; x < mNumPoints; x++) {
+                elementArray[index++] = (y) * (mNumPoints) + x;
+                elementArray[index++] = (y + 1) * (mNumPoints) + x;
+            }
+        }
+
+        // setup requirements
+        this.animationWillBeginWithContext();
+    },
+
+    animationWillBeginWithContext: function() {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var program = this.program["twist"];
+        var uniforms = program.uniforms;
+        var attribs = program.attribs;
+
+        gl.enable(gl.CULL_FACE);
+
+        this.buffers = {};
+        this.buffers["TexCoord"] = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers["TexCoord"]);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.TexCoords), gl.STATIC_DRAW);
+        gl.vertexAttribPointer(attribs["TexCoord"], 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(attribs["TexCoord"]);
+
+        this.buffers["Position"] = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers["Position"]);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.PositionCoords), gl.DYNAMIC_DRAW);
+        gl.vertexAttribPointer(attribs["Position"], 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(attribs["Position"]);
+
+        this.buffers["Normal"] = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers["Normal"]);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.NormalCoords), gl.DYNAMIC_DRAW);
+        gl.vertexAttribPointer(attribs["Normal"], 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(attribs["Normal"]);
+
+        this.MVPMatrix = renderer.slideProjectionMatrix;
+        gl.uniformMatrix4fv(uniforms["MVPMatrix"], false, this.MVPMatrix);
+
+        this.AffineTransform = new Matrix3();
+        this.AffineTransform.affineScale(1.0, -1.0);
+        this.AffineTransform.affineTranslate(0.0, 1.0);
+
+        this.AffineIdentity = new Matrix3();
+
+        this.elementIndicesBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.elementIndicesBuffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(this.elementArray), gl.STATIC_DRAW);
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.uniform1i(uniforms["Texture"], 0);
+
+        this.drawFrame(0, 0, 4);
+    },
+
+    drawFrame: function(difference, elapsed, duration) {
+        var gl = this.gl;
+        var program = this.program["twist"];
+        var attribs = program.attribs;
+        var percentfinished = this.percentfinished;
+
+        percentfinished += difference / duration;
+        percentfinished > 1 ? percentfinished = 1 : 0;
+        this.specularcolor = TSUSineMap(percentfinished * 2) * 0.5;
+
+        var y, x;
+        var height = gl.viewportHeight / 2.0;
+        var mNumPoints = this.mNumPoints;
+        var TexCoords = this.TexCoords;
+        var PositionCoords = this.PositionCoords;
+        var NormalCoords = this.NormalCoords;
+
+        for (y = 0; y < mNumPoints; y++) {
+            for (x = 0; x < mNumPoints; x++) {
+                var index = y * mNumPoints + x;
+                var start = {};
+                start.x = TexCoords[index * 2];
+                start.y = TexCoords[index * 2 + 1];
+                var angle = -Math.PI * TwistFX(this.direction === KNDirection.kKNDirectionLeftToRight ? start.x : (1 - start.x), percentfinished);
+                var result = {};
+                result.y = (height - (height * (1 - start.y * 2) * Math.cos(angle)));
+                result.z = (height * (1 - start.y * 2) * Math.sin(angle));
+                PositionCoords[index * 3 + 1] = result.y;
+                PositionCoords[index * 3 + 2] = result.z;
+            }
+        }
+
+        for (y = 0; y < mNumPoints; y++) {
+            for (x = 0; x < mNumPoints; x++) {
+                var finalNormal = new vector3();
+                var index = y * mNumPoints + x;
+                for (var q = 0; q < 4; q++) {
+                    var q1x = 0, q1y = 0, q2x = 0, q2y = 0;
+                    switch (q) {
+                    case 0:
+                        q1x = 1;
+                        q2y = 1;
+                        break;
+                    case 1:
+                        q1y = 1;
+                        q2x = -1;
+                        break;
+                    case 2:
+                        q1x = -1;
+                        q2y = -1;
+                        break;
+                    case 3:
+                        q1y = -1;
+                        q2x = 1;
+                    default:
+                        break;
+                    }
+                    if ((x + q1x) < 0 || (x + q2x) < 0 || (y + q1y) < 0 || (y + q2y) < 0
+                        || x + q1x >= mNumPoints || x + q2x >= mNumPoints || y + q1y >= mNumPoints || y + q2y >= mNumPoints) {
+                        continue;
+                    }
+                    var thisV = new vector3([PositionCoords[index * 3], PositionCoords[index * 3 + 1], PositionCoords[index * 3 + 2] ]);
+                    var nextV = new vector3([PositionCoords[((y + q1y) * mNumPoints + (x + q1x)) * 3], PositionCoords[((y + q1y) * mNumPoints + (x + q1x)) * 3 + 1], PositionCoords[((y + q1y) * mNumPoints + (x + q1x)) * 3 + 2] ]);
+                    var prevV = new vector3([PositionCoords[(((y + q2y) * mNumPoints) + (x + q2x)) * 3], PositionCoords[(((y + q2y) * mNumPoints) + (x + q2x)) * 3 + 1], PositionCoords[(((y + q2y) * mNumPoints) + (x + q2x)) * 3 + 2] ]);
+                    nextV.subtract(thisV);
+                    prevV.subtract(thisV);
+                    nextV.cross(prevV); // cross gives you the normal
+
+                    finalNormal.add(nextV);
+                }
+                finalNormal.normalize();
+                finalNormal.scale(-1.0);
+                finalNormal = finalNormal.getArray();
+                NormalCoords[index * 3] = finalNormal[0];
+                NormalCoords[index * 3 + 1] = finalNormal[1];
+                NormalCoords[index * 3 + 2] = finalNormal[2];
+            }
+        }
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers["Position"]);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(PositionCoords), gl.DYNAMIC_DRAW);
+        gl.vertexAttribPointer(attribs["Position"], 3, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers["Normal"]);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(NormalCoords), gl.DYNAMIC_DRAW);
+        gl.vertexAttribPointer(attribs["Normal"], 3, gl.FLOAT, false, 0, 0);
+
+        this.percentfinished = percentfinished;
+        this.draw();
+    },
+
+    draw: function() {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var program = this.program["twist"];
+        var uniforms = program.uniforms;
+        var textures = this.textures;
+        var texture = textures[0].texture;
+        var outgoingTexture = textures[1].texture;
+        var mNumPoints = this.mNumPoints;
+        var specularcolor = this.specularcolor;
+        var AffineTransform = this.AffineTransform.getColumnMajorFloat32Array();
+        var AffineIdentity = this.AffineIdentity.getColumnMajorFloat32Array();
+        var elementIndicesBuffer = this.elementIndicesBuffer;
+
+        if (!specularcolor) {
+            specularcolor = 0;
+        }
+        gl.uniform1f(uniforms["SpecularColor"], specularcolor);
+        if (this.percentfinished < 0.5) {
+            gl.cullFace(gl.BACK);
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, elementIndicesBuffer);
+
+            gl.uniformMatrix3fv(uniforms["TextureMatrix"], false, AffineTransform);
+            gl.uniform1f(uniforms["FlipNormals"], 1.0);
+            // draw
+            for (y = 0; y < mNumPoints - 1; y++) {
+                gl.drawElements(gl.TRIANGLE_STRIP, mNumPoints * 2, gl.UNSIGNED_SHORT, y * mNumPoints * 2 * (2));
+            }
+            // ANIMATE OVERLAY
+            gl.cullFace(gl.FRONT);
+            gl.bindTexture(gl.TEXTURE_2D, outgoingTexture);
+            gl.uniformMatrix3fv(uniforms["TextureMatrix"], false, AffineIdentity);
+            gl.uniform1f(uniforms["FlipNormals"], -1.0);
+            for (y = 0; y < mNumPoints - 1; y++) {
+                gl.drawElements(gl.TRIANGLE_STRIP, mNumPoints * 2, gl.UNSIGNED_SHORT, y * mNumPoints * 2 * (2));
+            }
+        } else {
+            gl.cullFace(gl.FRONT);
+            gl.bindTexture(gl.TEXTURE_2D, outgoingTexture);
+            gl.uniformMatrix3fv(uniforms["TextureMatrix"], false, AffineIdentity);
+            gl.uniform1f(uniforms["FlipNormals"], -1.0);
+            for (y = 0; y < mNumPoints - 1; y++) {
+                gl.drawElements(gl.TRIANGLE_STRIP, mNumPoints * 2, gl.UNSIGNED_SHORT, y * mNumPoints * 2 * (2));
+            }
+
+            gl.cullFace(gl.BACK);
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, elementIndicesBuffer);
+
+            gl.uniformMatrix3fv(uniforms["TextureMatrix"], false, AffineTransform);
+            gl.uniform1f(uniforms["SpecularColor"], specularcolor);
+            gl.uniform1f(uniforms["FlipNormals"], 1.0);
+            // draw
+            for (y = 0; y < mNumPoints - 1; y++) {
+                gl.drawElements(gl.TRIANGLE_STRIP, mNumPoints * 2, gl.UNSIGNED_SHORT, y * mNumPoints * 2 * (2));
+            }
+        }
+    }
+});
+
+var KNWebGLTransitionColorPlanes = Class.create(KNWebGLProgram, {
+    initialize: function($super, renderer, params) {
+        this.programData = {
+            name: "com.apple.iWork.Keynote.KLNColorPlanes",
+            programNames:["colorPlanes"],
+            effect: params.effect,
+            textures: params.textures
+        };
+
+        $super(renderer, this.programData);
+
+        var direction = this.effect.attributes.direction;
+        if (direction !== KNDirection.kKNDirectionLeftToRight && direction !== KNDirection.kKNDirectionRightToLeft && direction !== KNDirection.kKNDirectionTopToBottom && direction !== KNDirection.kKNDirectionBottomToTop) {
+            // default direction to left to right if not specified
+            direction = KNDirection.kKNDirectionLeftToRight
+        }
+        this.direction = direction;
+
+        this.mNumColors = 3;
+        this.percentfinished = 0.0;
+
+        // setup requirements
+        this.animationWillBeginWithContext();
+    },
+
+    animationWillBeginWithContext: function() {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var program = this.program["colorPlanes"];
+        var uniforms = program.uniforms;
+        var attribs = program.attribs;
+        var textureInfo = this.textures[0];
+
+        gl.disable(gl.CULL_FACE);
+        gl.blendFunc(gl.ONE, gl.ONE);
+
+        var buffers = this.buffers = {};
+        buffers["TexCoord"] = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffers["TexCoord"]);
+
+        var TexCoords = this.TexCoords = [
+            0.0, 0.0,
+            0.0, 1.0,
+            1.0, 0.0,
+            1.0, 1.0,
+        ];
+
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(TexCoords), gl.STATIC_DRAW);
+        gl.vertexAttribPointer(attribs["TexCoord"], 2, gl.FLOAT, false, 0,0);
+        gl.enableVertexAttribArray(attribs["TexCoord"]);
+
+        buffers["Position"] = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffers["Position"]);
+
+        var PositionCoords = this.PositionCoords = [
+            0.0, 0.0, 0.0,
+            0.0, textureInfo.height, 0.0,
+            textureInfo.width, 0.0, 0.0,
+            textureInfo.width, textureInfo.height, 0.0
+        ];
+
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(PositionCoords), gl.STATIC_DRAW);
+        gl.vertexAttribPointer(attribs["Position"], 3, gl.FLOAT, false, 0,0);
+        gl.enableVertexAttribArray(attribs["Position"]);
+
+        this.MVPMatrix = renderer.slideProjectionMatrix;
+        gl.uniformMatrix4fv(uniforms["MVPMatrix"], false, this.MVPMatrix);
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.uniform1i(uniforms["Texture"], 0);
+        this.drawFrame(0, 0, 4);
+    },
+
+    drawFrame: function(difference, elapsed, duration) {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var program = this.program["colorPlanes"];
+        var uniforms = program.uniforms;
+        var attribs = program.attribs;
+        var textures = this.textures;
+        var textureInfo = textures[0];
+        var outgoingTextureInfo = textures[1];
+
+        this.percentfinished += difference / duration;
+        this.percentfinished > 1 ? this.percentfinished = 1 : 0;
+        var percent = this.percentfinished;
+        var direction = this.direction;
+
+        var planeSeparation = 0.25;
+        var cameraPullBack = 1.0;
+
+        var clockwise = (direction == KNDirection.kKNDirectionRightToLeft || direction == KNDirection.kKNDirectionBottomToTop);
+        var yAxis = (direction == KNDirection.kKNDirectionLeftToRight || direction == KNDirection.kKNDirectionRightToLeft);
+
+        var percentInvSq = 1-(1-percent)*(1-percent);
+
+        var cameraAmount = yAxis ? textureInfo.width : textureInfo.height;
+
+        var uCurve = TSUSineMap(percent * 2.0);
+        var planeOffset = uCurve * cameraAmount * planeSeparation;
+
+        var zOffset = Math.sin(-percentInvSq*2.*Math.PI);
+        zOffset *= percentInvSq * cameraAmount * cameraPullBack;
+
+        if (percent < 0.5) {
+            gl.bindTexture(gl.TEXTURE_2D, outgoingTextureInfo.texture);
+            gl.uniform2fv(uniforms["FlipTexCoords"], new Float32Array([0,0]));
+        } else {
+            gl.bindTexture(gl.TEXTURE_2D, textureInfo.texture);
+            if (direction == KNDirection.kKNDirectionTopToBottom || direction == KNDirection.kKNDirectionBottomToTop) {
+                gl.uniform2fv(uniforms["FlipTexCoords"], new Float32Array([0,1]));
+            } else {
+                gl.uniform2fv(uniforms["FlipTexCoords"], new Float32Array([1,0]));
+            }
+        }
+
+        for (var iHue = 0, mNumColors = this.mNumColors; iHue < mNumColors; iHue++) {
+            var thisHue = iHue/mNumColors;
+
+            // setup color mask
+            var color = WebGraphics.colorWithHSBA(thisHue, 1, 1, 1/mNumColors);
+            gl.uniform4fv(uniforms["ColorMask"], new Float32Array([color.red, color.green, color.blue, color.alpha]));
+
+            var angle = (Math.PI/180.0) * (180.0 * (TSUSineMap(percent)));
+            var mvpMatrix = WebGraphics.translateMatrix4(this.MVPMatrix, textureInfo.width/2, textureInfo.height/2, zOffset);
+            mvpMatrix =  WebGraphics.rotateMatrix4AboutXYZ(mvpMatrix, angle, (clockwise ? -1 : 1) * (yAxis ? 0 : 1), (clockwise ? -1 : 1) * (yAxis ? 1 : 0), 0);
+            mvpMatrix = WebGraphics.translateMatrix4(mvpMatrix, -textureInfo.width/2, -textureInfo.height/2, planeOffset*(iHue-1));
+
+            gl.uniformMatrix4fv(uniforms["MVPMatrix"], false, mvpMatrix);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        }
+    }
+});
+
+var KNWebGLTransitionFlop = Class.create(KNWebGLProgram, {
+    initialize: function($super, renderer, params) {
+        this.programData = {
+            name: "com.apple.iWork.Keynote.BUKFlop",
+            programNames:["flop", "defaultTexture"],
+            effect: params.effect,
+            textures: params.textures
+        };
+
+        $super(renderer, this.programData);
+
+        var direction = this.effect.attributes.direction;
+        if (direction !== KNDirection.kKNDirectionLeftToRight && direction !== KNDirection.kKNDirectionRightToLeft && direction !== KNDirection.kKNDirectionTopToBottom && direction !== KNDirection.kKNDirectionBottomToTop) {
+            // default direction to left to right if not specified
+            direction = KNDirection.kKNDirectionLeftToRight
+        }
+        this.direction = direction;
+
+        this.percentfinished = 0.0;
+        var elementArray = this.elementArray = [];
+
+        var gl = this.gl;
+        var texWidth = gl.viewportWidth;
+        var texHeight = gl.viewportHeight;
+        var width = texWidth
+        var height = texHeight;
+
+        if (direction === KNDirection.kKNDirectionTopToBottom || direction === KNDirection.kKNDirectionBottomToTop) {
+            height *= 0.5;
+        } else {
+            width *= 0.5;
+        }
+
+        var mNumPoints = this.mNumPoints = 8;
+        var index = 0;
+
+        for (y = 0; y < mNumPoints - 1; y++) {
+            for (x = 0; x < mNumPoints; x++) {
+                elementArray[index++] = (y + 0) * (mNumPoints) + x;
+                elementArray[index++] = (y + 1) * (mNumPoints) + x;
+            }
+        }
+
+        var dx = width / (mNumPoints - 1);
+        var dy = height / (mNumPoints - 1);
+        var yOffset = (direction == KNDirection.kKNDirectionTopToBottom) ? height : yOffset = 0;
+        var xOffset = (direction == KNDirection.kKNDirectionRightToLeft) ? width : xOffset = 0;
+
+        var attributeBufferData = this.attributeBufferData = {
+            Position: [],
+            TexCoords: [],
+            Normal: [],
+            ShadowPosition: [],
+            ShadowTexCoord: [],
+            PreviousPosition: [],
+            PreviousTexCoords: [],
+            PreviousNormal: []
+        };
+
+        for (var y = 0; y < mNumPoints; y++) {
+            for (var x = 0; x < mNumPoints; x++) {
+                index = y * mNumPoints + x;
+                KNWebGLUtil.setPoint3DAtIndexForAttribute(WebGraphics.makePoint3D(x * dx + xOffset, y * dy, 0), index, attributeBufferData["Position"]);
+                KNWebGLUtil.setPoint2DAtIndexForAttribute(WebGraphics.makePoint((x * dx + xOffset) / texWidth, (y * dy + yOffset) / texHeight), index, attributeBufferData["TexCoords"]);
+                KNWebGLUtil.setPoint3DAtIndexForAttribute(WebGraphics.makePoint3D(0, 0, 1), index, attributeBufferData["Normal"]);
+            }
+        }
+
+        // setup requirements
+        this.animationWillBeginWithContext();
+    },
+
+    animationWillBeginWithContext: function() {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var program = this.program["flop"];
+        var attribs = program.attribs;
+        var uniforms = program.uniforms;
+        var basicProgram = this.program["defaultTexture"];
+        var MVPMatrix = this.MVPMatrix = renderer.slideProjectionMatrix;
+        var width = gl.viewportWidth;
+        var height = gl.viewportHeight;
+        var direction = this.direction;
+
+        if (direction === KNDirection.kKNDirectionTopToBottom || direction === KNDirection.kKNDirectionBottomToTop) {
+            height *= 0.5;
+        } else {
+            width *= 0.5;
+        }
+
+        var textureCoordinates = [
+            0.0, 0.0,
+            0.0, 0.5,
+            1.0, 0.0,
+            1.0, 0.5,
+        ];
+
+        var boxPosition = [
+            0.0, 0.0, 0.0,
+            0.0, height, 0.0,
+            width,0.0, 0.0,
+            width, height, 0.0,
+        ];
+
+        var textureCoordinates2 = [
+            0.0, 0.5,
+            0.0, 1.0,
+            1.0, 0.5,
+            1.0, 1.0,
+        ];
+
+        var boxPosition2 = [
+            0.0, height, 0.0,
+            0.0, height*2, 0.0,
+            width, height, 0.0,
+            width, height*2, 0.0,
+        ];
+
+        // use this program and enable vertex attrib array
+        KNWebGLUtil.enableAttribs(gl, program);
+
+        var attributeBufferData = this.attributeBufferData;
+        var buffers = this.buffers = {};
+        var Coordinates = this.Coordinates = {};
+
+        buffers["TexCoord"] = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffers["TexCoord"]);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(attributeBufferData["TexCoords"]), gl.DYNAMIC_DRAW);
+        gl.vertexAttribPointer(attribs["TexCoord"], 2, gl.FLOAT, false, 0,0);
+
+        buffers["Position"] = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffers["Position"]);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(attributeBufferData["Position"]), gl.DYNAMIC_DRAW);
+        gl.vertexAttribPointer(attribs["Position"], 3, gl.FLOAT, false, 0,0);
+
+        buffers["Normal"] = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffers["Normal"]);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(attributeBufferData["Normal"]), gl.DYNAMIC_DRAW);
+        gl.vertexAttribPointer(attribs["Normal"], 3, gl.FLOAT, false, 0,0);
+
+        gl.uniformMatrix4fv(uniforms["MVPMatrix"], false, MVPMatrix);
+
+        var AffineTransform = this.AffineTransform = new Matrix3();
+        if (direction === KNDirection.kKNDirectionTopToBottom) {
+            AffineTransform.affineScale(1.0, -1.0);
+            AffineTransform.affineTranslate(0.0,1.0);
+        } else if (direction == KNDirection.kKNDirectionBottomToTop) {
+            AffineTransform.affineScale(1.0, -1.0);
+            AffineTransform.affineTranslate(0.0,1.0);
+            textureCoordinates = [
+               0.0, 0.5,
+               0.0, 1.0,
+               1.0, 0.5,
+               1.0, 1.0,
+            ];
+
+            textureCoordinates2 = [
+                0.0, 0.0,
+                0.0, 0.5,
+                1.0, 0.0,
+                1.0, 0.5,
+            ];
+
+            boxPosition = [
+                0.0, height, 0.0,
+                0.0, height*2, 0.0,
+                width,height, 0.0,
+                width, height*2, 0.0,
+            ];
+
+            boxPosition2 = [
+                0, 0, 0.0,
+                0, height, 0.0,
+                width, 0, 0.0,
+                width, height, 0.0,
+            ];
+        } else if (direction == KNDirection.kKNDirectionRightToLeft) {
+            AffineTransform.affineScale(-1.0, 1.0);
+            AffineTransform.affineTranslate(1.0, 0.0);
+            textureCoordinates = [
+                0.0, 0.0,
+                0.0, 1.0,
+                0.5, 0.0,
+                0.5, 1.0,
+            ];
+            textureCoordinates2 = [
+                0.5, 0.0,
+                0.5, 1.0,
+                1.0, 0.0,
+                1.0, 1.0,
+            ];
+            boxPosition2 = [
+                width, 0, 0.0,
+                width, height, 0.0,
+                width*2, 0, 0.0,
+                width*2, height, 0.0,
+            ];
+        } else if (direction === KNDirection.kKNDirectionLeftToRight) {
+            AffineTransform.affineScale(-1.0, 1.0);
+            AffineTransform.affineTranslate(1.0, 0.0);
+            boxPosition = [
+                width, 0, 0.0,
+                width, height, 0.0,
+                width*2,0, 0.0,
+                width*2, height, 0.0,
+            ];
+            textureCoordinates = [
+                0.5, 0.0,
+                0.5, 1.0,
+                1.0, 0.0,
+                1.0, 1.0,
+            ];
+            textureCoordinates2 = [
+                0.0, 0.0,
+                0.0, 1.0,
+                0.5, 0.0,
+                0.5, 1.0,
+            ];
+            boxPosition2 = [
+                0, 0, 0.0,
+                0, height, 0.0,
+                width, 0, 0.0,
+                width, height, 0.0,
+            ];
+        }
+
+        this.AffineIdentity = new Matrix3();
+        this.elementIndicesBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.elementIndicesBuffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(this.elementArray), gl.STATIC_DRAW);
+
+        //setup second program
+        Coordinates["DefaultTexture"] = textureCoordinates;
+        Coordinates["DefaultTexture2"] = textureCoordinates2;
+        Coordinates["DefaultPosition"] = boxPosition;
+        Coordinates["DefaultPosition2"] = boxPosition2;
+
+        // use this program and enable vertex attrib array
+        KNWebGLUtil.enableAttribs(gl, basicProgram);
+
+        //setup VBO and FTB
+        buffers["TextureCoordinates"] = gl.createBuffer();
+        buffers["PositionCoordinates"] = gl.createBuffer();
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffers["TextureCoordinates"]);
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffers["PositionCoordinates"]);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates), gl.DYNAMIC_DRAW);
+        gl.vertexAttribPointer(basicProgram.attribs["TexCoord"], 2, gl.FLOAT, false, 0, 0);
+
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(boxPosition), gl.DYNAMIC_DRAW);
+        gl.vertexAttribPointer(basicProgram.attribs["Position"], 3, gl.FLOAT, false, 0, 0);
+
+        gl.uniform1i(basicProgram.uniforms["Texture"], 0);
+        gl.uniformMatrix4fv(basicProgram.uniforms["MVPMatrix"], false, MVPMatrix);
+
+        // switch back to main program with animation
+        gl.useProgram(program.shaderProgram);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.uniform1i(program.uniforms["Texture"], 0);
+
+        this.drawFrame(0, 0, 4);
+    },
+
+    drawFrame: function(difference, elapsed, duration) {
+        this.percentfinished += difference / duration;
+        this.percentfinished > 1 ? this.percentfinished = 1 : 0;
+
+        this.updateFlopWithPercent();
+        this.draw();
+    },
+
+    updateFlopWithPercent: function() {
+        var gl = this.gl;
+        var direction = this.direction;
+        var texWidth = gl.viewportWidth;
+        var texHeight = gl.viewportHeight;
+
+        var thetaA = this.percentfinished * Math.PI;
+        var thetaB = this.percentfinished * this.percentfinished * this.percentfinished * Math.PI;
+
+        var height = texHeight / 2.0;
+        var width = texWidth / 2.0;
+        var location = 0.0;
+        var mNumPoints = this.mNumPoints;
+        var attributeBufferData = this.attributeBufferData;
+
+        for (var y = 0; y < mNumPoints; y++) {
+            for(var x = 0; x < mNumPoints; x++) {
+                var index = y * mNumPoints + x;
+                var start = KNWebGLUtil.getPoint2DForArrayAtIndex(attributeBufferData["TexCoords"], index);
+
+                start.x *= texWidth;
+                start.y *= texHeight;
+
+                if (direction === KNDirection.kKNDirectionBottomToTop) {
+                    location = start.y / height;
+                } else if (direction === KNDirection.kKNDirectionTopToBottom) {
+                    location = (height*2 - start.y) / height;
+                } else if (direction === KNDirection.kKNDirectionLeftToRight) {
+                    location = start.x / width;
+                } else {
+                    location = (width*2 - start.x) / width;
+                }
+
+                var angle = location*thetaA + (1-location) * thetaB;
+                if (direction === KNDirection.kKNDirectionLeftToRight || direction === KNDirection.kKNDirectionTopToBottom) {
+                    angle *= -1;
+                }
+
+                var sinAngle = Math.sin(angle);
+                var cosAngle = Math.cos(angle);
+                var startPosition = KNWebGLUtil.getPoint3DForArrayAtIndex(attributeBufferData["Position"], index);
+                var startNormal = KNWebGLUtil.getPoint3DForArrayAtIndex(attributeBufferData["Normal"], index);
+
+                if (direction === KNDirection.kKNDirectionTopToBottom || direction === KNDirection.kKNDirectionBottomToTop) {
+                    var thisPosition = WebGraphics.makePoint3D(startPosition.x, height - (height - start.y) * cosAngle, (height - start.y) * sinAngle);
+                    KNWebGLUtil.setPoint3DAtIndexForAttribute(thisPosition, index, attributeBufferData["Position"]);
+
+                    var thisNormal = WebGraphics.makePoint3D(startNormal.x, -sinAngle, cosAngle);
+                    KNWebGLUtil.setPoint3DAtIndexForAttribute(thisNormal, index, attributeBufferData["Normal"]);
+                } else {
+                    var thisPosition = WebGraphics.makePoint3D(width - (width - start.x) * cosAngle, startPosition.y, -(width - start.x) * sinAngle);
+                    KNWebGLUtil.setPoint3DAtIndexForAttribute(thisPosition, index, attributeBufferData["Position"]);
+
+                    var thisNormal = WebGraphics.makePoint3D(-sinAngle, startNormal.y, cosAngle);
+                    KNWebGLUtil.setPoint3DAtIndexForAttribute(thisNormal, index, attributeBufferData["Normal"]);
+                }
+            }
+        }
+    },
+
+    draw: function() {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var program = this.program["flop"];
+        var basicProgram = this.program["defaultTexture"];
+        var textures = this.textures;
+        var outgoingTexture = textures[1].texture;
+        var incomingTexture = textures[0].texture;
+
+        gl.useProgram(basicProgram.shaderProgram);
+        gl.disable(gl.CULL_FACE);
+        gl.bindTexture(gl.TEXTURE_2D, outgoingTexture);
+
+        var mNumPoints = this.mNumPoints;
+        var buffers = this.buffers;
+        var Coordinates = this.Coordinates;
+        var attributeBufferData = this.attributeBufferData;
+
+        KNWebGLUtil.bindDynamicBufferWithData(gl, basicProgram.attribs["Position"], buffers["PositionCoordinates"], Coordinates["DefaultPosition"], 3);
+        KNWebGLUtil.bindDynamicBufferWithData(gl, basicProgram.attribs["TexCoord"], buffers["TextureCoordinates"], Coordinates["DefaultTexture"], 2);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+        gl.useProgram(basicProgram.shaderProgram);
+        gl.disable(gl.CULL_FACE);
+        gl.bindTexture(gl.TEXTURE_2D, incomingTexture);
+
+        KNWebGLUtil.bindDynamicBufferWithData(gl, basicProgram.attribs["Position"], buffers["PositionCoordinates"], Coordinates["DefaultPosition2"], 3);
+        KNWebGLUtil.bindDynamicBufferWithData(gl, basicProgram.attribs["TexCoord"], buffers["TextureCoordinates"], Coordinates["DefaultTexture2"], 2);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+        gl.enable(gl.CULL_FACE);
+
+        //ANIMATE OVERLAY
+        gl.useProgram(program.shaderProgram);
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffers["Position"]);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(attributeBufferData["Position"]), gl.DYNAMIC_DRAW);
+        gl.vertexAttribPointer(program.attribs["Position"], 3, gl.FLOAT, false, 0,0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffers["Normal"]);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(attributeBufferData["Normal"]), gl.DYNAMIC_DRAW);
+        gl.vertexAttribPointer(program.attribs["Normal"], 3, gl.FLOAT, false, 0,0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffers["TexCoord"]);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(attributeBufferData["TexCoords"]), gl.DYNAMIC_DRAW);
+        gl.vertexAttribPointer(program.attribs["TexCoord"], 2, gl.FLOAT, false, 0,0);
+
+        gl.cullFace(gl.BACK);
+        gl.bindTexture(gl.TEXTURE_2D, incomingTexture);
+
+        gl.uniformMatrix3fv(program.uniforms["TextureMatrix"], false, this.AffineTransform.getColumnMajorFloat32Array());
+        gl.uniform1f(program.uniforms["FlipNormals"], -1.0);
+
+        for (var y = 0; y< mNumPoints-1; y++) {
+            gl.drawElements(gl.TRIANGLE_STRIP, mNumPoints*2, gl.UNSIGNED_SHORT, y*mNumPoints*2*(2));
+        }
+
+        gl.bindTexture(gl.TEXTURE_2D, outgoingTexture);
+        gl.cullFace(gl.FRONT);
+
+        gl.uniformMatrix3fv(program.uniforms["TextureMatrix"], false, this.AffineIdentity.getColumnMajorFloat32Array());
+        gl.uniform1f(program.uniforms["FlipNormals"], 1.0);
+        for (var y = 0; y < mNumPoints-1; y++) {
+            gl.drawElements(gl.TRIANGLE_STRIP, mNumPoints*2, gl.UNSIGNED_SHORT, y*mNumPoints*2*(2));
+        }
+    }
+
+});
+
+var KNWebGLBuildAnvil = Class.create(KNWebGLProgram, {
+    initialize: function($super, renderer, params) {
+        var effect = params.effect;
+
+        this.programData = {
+            name: "com.apple.iWork.Keynote.BUKAnvil",
+            programNames: ["anvilsmoke", "anvilspeck"],
+            effect: effect,
+            textures: params.textures
+        };
+
+        $super(renderer, this.programData);
+
+        var gl = this.gl;
+
+        // bind required textures from base64 image source
+        this.smokeTexture = KNWebGLUtil.bindTextureWithImage(gl, smokeImage);
+        this.speckTexture = KNWebGLUtil.bindTextureWithImage(gl, speckImage);
+
+        // initialize percent finish
+        this.percentfinished = 0;
+
+        // create drawable object for drawing static texture
+        this.drawableObjects = [];
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var texture = params.textures[i];
+            var drawableParams = {
+                effect: effect,
+                textures: [texture]
+            };
+
+            var drawableObject = new KNWebGLDrawable(renderer, drawableParams);
+            this.drawableObjects.push(drawableObject);
+        }
+
+        this.objectY = 1;
+
+        // set parent opacity from CA baseLayer
+        this.parentOpacity = effect.baseLayer.initialState.opacity;
+
+        // setup requirements
+        this.animationWillBeginWithContext();
+    },
+
+    animationWillBeginWithContext: function() {
+        var renderer = this.renderer;
+        var gl = this.gl;
+
+        this.smokeSystems = [];
+        this.speckSystems = [];
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var textureInfo = this.textures[i];
+            var width = textureInfo.width;
+            var height = textureInfo.height;
+            var viewportWidth = gl.viewportWidth;
+            var viewportHeight = gl.viewportHeight;
+
+            var numParticles = 300;
+
+            var smokeSystem = new KNWebGLBuildAnvilSmokeSystem(
+                renderer,
+                this.program["anvilsmoke"],
+                {"width": width, "height": height},
+                {"width": viewportWidth, "height": viewportHeight},
+                this.duration,
+                {"width": numParticles, "height": 1},
+                {"width": kParticleSize, "height": kParticleSize},
+                this.smokeTexture);
+
+            numParticles = 40;
+            var speckSystem = new KNWebGLBuildAnvilSpeckSystem(
+                renderer,
+                this.program["anvilspeck"],
+                {"width": width, "height": height},
+                {"width": viewportWidth, "height": viewportHeight},
+                this.duration,
+                {"width": numParticles, "height": 1},
+                {"width": kParticleSize, "height": kParticleSize},
+                this.speckTexture);
+
+            this.smokeSystems.push(smokeSystem);
+            this.speckSystems.push(speckSystem);
+        }
+    },
+
+    drawFrame: function(difference, elapsed, duration) {
+        var renderer = this.renderer;
+        var gl = this.gl;
+
+        this.percentfinished += difference / duration;
+
+        if (this.percentfinished >= 1) {
+            this.percentfinished = 1;
+            this.isCompleted = true;
+        }
+
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var textureInfo = this.textures[i];
+            var initialState = textureInfo.initialState;
+            var animations = textureInfo.animations;
+
+            if (textureInfo.hasHighlightedBulletAnimation) {
+                if (!initialState.hidden) {
+                    var opacity;
+                    if (animations.length > 0 && animations[0].property === "opacity") {
+                        var opacityFrom = animations[0].from.scalar;
+                        var opacityTo = animations[0].to.scalar;
+                        var diff = opacityTo - opacityFrom;
+                        opacity = opacityFrom + diff * this.percentfinished;
+                    } else {
+                        opacity = textureInfo.initialState.opacity;
+                    }
+
+                    this.drawableObjects[i].Opacity = this.parentOpacity * opacity;
+                    this.drawableObjects[i].drawFrame();
+                }
+            } else if (textureInfo.animations.length > 0) {
+                if (this.isCompleted) {
+                    // if completed, just draw its texture object for better performance
+                    this.drawableObjects[i].Opacity = this.parentOpacity * textureInfo.initialState.opacity;;
+                    this.drawableObjects[i].drawFrame();
+                    continue;
+                }
+
+                var width = textureInfo.width;
+                var height = textureInfo.height;
+                var offsetX = textureInfo.offset.pointX;
+                var offsetY = textureInfo.offset.pointY;
+                var viewportWidth = gl.viewportWidth;
+                var viewportHeight = gl.viewportHeight;
+
+                duration /= 1000;
+
+                var kObjectSmashDuration = Math.min(0.20, duration * 0.4);
+                var kCameraShakeDuration = Math.min(0.25, duration * 0.5);
+
+                var cameraShakePoints = this.cameraShakePointsWithRandomGenerator();
+                var cameraShakePercent = (this.percentfinished * duration - kObjectSmashDuration) / kCameraShakeDuration;
+
+                var shakePoint = WebGraphics.makePoint(0, 0);
+                if (0 < cameraShakePercent && cameraShakePercent < 1) {
+                    var minIndex = Math.floor(cameraShakePercent * kNumCameraShakePoints);
+                    var maxIndex = Math.ceil(WebGraphics.clamp(cameraShakePercent * kNumCameraShakePoints, 0, cameraShakePoints.length - 1));
+                    var minPoint = cameraShakePoints[minIndex];
+                    var maxPoint = cameraShakePoints[maxIndex];
+                    var cameraLerp = cameraShakePercent * kNumCameraShakePoints - minIndex;
+                        shakePoint = WebGraphics.makePoint(
+                        WebGraphics.mix(minPoint.x, maxPoint.x, cameraLerp),
+                        WebGraphics.mix(minPoint.y, maxPoint.y, cameraLerp));
+                }
+
+                var objectSmashPercent = WebGraphics.clamp((this.percentfinished * duration) / kObjectSmashDuration, 0, 1);
+                var smokepercent = WebGraphics.clamp(((this.percentfinished * duration) - kObjectSmashDuration) / (duration - kObjectSmashDuration), 0, 1);
+
+                var percent = this.percentfinished;
+
+                // calculations for the camera shake
+                this.objectY = offsetY + height;
+                this.objectY *= (1.0 - objectSmashPercent * objectSmashPercent);
+
+                // draw the texture
+                this.drawableObjects[i].MVPMatrix = WebGraphics.translateMatrix4(
+                    renderer.slideOrthoMatrix,
+                    offsetX + (shakePoint.x * viewportWidth),
+                    viewportHeight - offsetY - height + this.objectY + (shakePoint.y * viewportHeight),
+                    0);
+
+                this.drawableObjects[i].Opacity = this.parentOpacity * textureInfo.initialState.opacity;
+                this.drawableObjects[i].drawFrame();
+
+                // draw smoke
+                var MVPMatrix = WebGraphics.translateMatrix4(renderer.slideProjectionMatrix, offsetX, viewportHeight - (offsetY + (height + 16)) * (1 - (smokepercent * smokepercent * 0.02)), 0);
+                var smokeSystem = this.smokeSystems[i];
+                smokeSystem.setMVPMatrix(MVPMatrix);
+                smokeSystem.drawFrame(smokepercent, 1 - (smokepercent * smokepercent));
+
+                // draw specks
+                if (smokepercent < 0.50) {
+                    MVPMatrix = WebGraphics.translateMatrix4(renderer.slideOrthoMatrix, offsetX, viewportHeight - (offsetY + height + 16), 0);
+                    var speckSystem = this.speckSystems[i];
+                    speckSystem.setMVPMatrix(MVPMatrix);
+                    speckSystem.drawFrame(smokepercent, WebGraphics.clamp(1 - WebGraphics.sineMap(smokepercent) * 2, 0, 1));
+                }
+            } else {
+                if (!textureInfo.initialState.hidden) {
+                    this.drawableObjects[i].Opacity = this.parentOpacity * textureInfo.initialState.opacity;
+                    this.drawableObjects[i].drawFrame();
+                }
+            }
+        }
+    },
+
+    cameraShakePointsWithRandomGenerator: function() {
+        var cameraShakePoints = [];
+        var globalScale = 0.025;
+
+        for (var i = 0; i < kNumCameraShakePoints; i++) {
+            var scale = 1 - (i / kNumCameraShakePoints);
+            scale *= scale;
+
+            var thisPoint = WebGraphics.makePoint(
+                WebGraphics.randomBetween(-1, 1) * globalScale * scale * 0.4, Math.pow(-1, i) * globalScale * scale);
+
+            cameraShakePoints[i] = thisPoint;
+        }
+        return cameraShakePoints;
+    }
+});
+
+var KNWebGLBuildFlame = Class.create(KNWebGLProgram, {
+    initialize: function($super, renderer, params) {
+        this.programData = {
+            name: "com.apple.iWork.Keynote.KLNFlame",
+            programNames: ["flame"],
+            effect: params.effect,
+            textures: params.textures
+        };
+
+        $super(renderer, this.programData);
+
+        var gl = this.gl;
+
+        // bind required textures from base64 image source
+        this.flameTexture = KNWebGLUtil.bindTextureWithImage(gl, flameImage);
+
+        // initialize percent finish
+        this.percentfinished = 0;
+
+        // create drawable object for drawing static texture
+        this.drawableObjects = [];
+
+        // create framebuffer drawable object array for drawing flame
+        this.framebufferDrawableObjects = [];
+
+        this.slideSize = {"width": gl.viewportWidth, "height": gl.viewportHeight};
+
+        var effect = this.effect;
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var texture = params.textures[i];
+            var drawableParams = {
+                effect: effect,
+                textures: [texture]
+            };
+
+            var drawableObject = new KNWebGLDrawable(renderer, drawableParams);
+            this.drawableObjects.push(drawableObject);
+
+            var drawableFrame = {
+                "size": {
+                    "width": texture.width,
+                    "height": texture.height
+                },
+                "origin": {
+                    "x": texture.offset.pointX,
+                    "y": texture.offset.pointY
+                }
+            };
+
+            var frameRect = this.frameOfEffectWithFrame(drawableFrame);
+
+            var framebufferParams = {
+                effect: effect,
+                textures: [],
+                drawableFrame: drawableFrame,
+                frameRect: frameRect
+            };
+
+            var framebufferDrawable = new KNWebGLFramebufferDrawable(renderer, framebufferParams);
+
+            // push the framebufferDrawable to the array
+            this.framebufferDrawableObjects.push(framebufferDrawable);
+        }
+
+        // set parent opacity from CA baseLayer
+        this.parentOpacity = effect.baseLayer.initialState.opacity;
+
+        // setup requirements
+        this.animationWillBeginWithContext();
+    },
+
+    frameOfEffectWithFrame: function(drawableFrame) {
+        var objSize = drawableFrame.size;
+        var slideSize = this.slideSize;
+
+        // the larger the object, the less we have to inflate its size
+        var widthAdjust = (1.2 - Math.min(1.0, Math.sqrt(objSize.width / slideSize.width))) + 1.0;
+        var heightAdjust = (1.25 - Math.min(1.0, Math.sqrt(objSize.height / slideSize.height))) + 1.0;
+        var viewSize = {
+            "width": Math.round(objSize.width * widthAdjust),
+            "height": Math.round(objSize.height * heightAdjust)
+        };
+
+        if (objSize.width / objSize.height < 1.0) {
+            // for really skinny objects, make sure GL View is more squarish
+            viewSize.width = Math.max(viewSize.width, (objSize.width + objSize.height));
+        }
+
+        var rect = {
+            "size": viewSize,
+            "origin": {
+                "x": drawableFrame.origin.x + (objSize.width - viewSize.width) / 2,
+                "y": drawableFrame.origin.y + (objSize.height - viewSize.height) / 2
+            }
+        };
+
+        // Now move the FBO up a bit so only 25% of extra space is on the bottom
+        rect.origin.y -= (rect.size.height - drawableFrame.size.height) * 0.25;
+
+        var gl = this.gl;
+        var slideRect = {
+            "origin": {
+                "x": 0,
+                "y": 0
+            },
+            "size": {
+                "width": gl.viewportWidth,
+                "height": gl.viewportHeight
+            }
+        };
+
+        var mFrameRect = CGRectIntersection(rect, slideRect);
+        mFrameRect = CGRectIntegral(mFrameRect);
+
+        return mFrameRect;
+    },
+
+    p_orthoTransformWithScale: function(scale, offset, mFrameRect) {
+        var size = {
+            "width": mFrameRect.size.width * scale,
+            "height": mFrameRect.size.height * scale
+        };
+
+        var ortho = WebGraphics.makeOrthoMatrix4(0, size.width, 0, size.height, -1, 1);
+        var result = WebGraphics.translateMatrix4(ortho, offset.x, -offset.y, 0);
+
+        return result;
+    },
+
+    animationWillBeginWithContext: function() {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var duration = this.duration / 1000;
+
+        this.flameSystems = [];
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var textureInfo = this.textures[i];
+            var width = textureInfo.width;
+            var height = textureInfo.height;
+            var viewportWidth = gl.viewportWidth;
+            var viewportHeight = gl.viewportHeight;
+            var framebufferDrawable = this.framebufferDrawableObjects[i];
+            var mFrameRect = framebufferDrawable.frameRect
+            var mDrawableFrame = framebufferDrawable.drawableFrame;
+
+            var orthoOffset = {
+                "x": textureInfo.offset.pointX - mFrameRect.origin.x,
+                "y": textureInfo.offset.pointY + height - (mFrameRect.origin.y + mFrameRect.size.height)
+            };
+
+            var bottomPadding = mDrawableFrame.origin.y - mFrameRect.origin.y;
+            var topPadding = mFrameRect.origin.y + mFrameRect.size.height - (mDrawableFrame.origin.y + mDrawableFrame.size.height);
+            orthoOffset.y += (topPadding - bottomPadding);
+
+            framebufferDrawable.MVPMatrix = this.p_orthoTransformWithScale(1.0, orthoOffset, mFrameRect);
+
+            var ratio = width / height;
+            var numParticles = Math.round(ratio * 150);
+            numParticles *= (duration + Math.max(0, 1.0 - duration / 2));
+
+            // We updated actualSize, so need to update the max speed in the shader
+            var flameSystem = new KNWebGLBuildFlameSystem(
+                renderer,
+                this.program["flame"],
+                {"width": width, "height": height},
+                {"width": viewportWidth, "height": viewportHeight},
+                Math.max(2, this.duration),
+                numParticles,
+                this.flameTexture
+            );
+
+            flameSystem.p_setupParticleDataWithTexture(textureInfo);
+
+            this.flameSystems.push(flameSystem);
+        }
+    },
+
+    drawFrame: function(difference, elapsed, duration) {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var program = this.program["flame"];
+        var uniforms = program.uniforms;
+        var buildOut = this.buildOut;
+        var percentfinished = this.percentfinished;
+
+        percentfinished += difference / duration;
+
+        if (percentfinished >= 1) {
+            percentfinished = 1;
+            this.isCompleted = true;
+        }
+
+        this.percentfinished = percentfinished;
+
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var textureInfo = this.textures[i];
+            var initialState = textureInfo.initialState;
+            var animations = textureInfo.animations;
+
+            if (textureInfo.hasHighlightedBulletAnimation) {
+                if (!initialState.hidden) {
+                    var opacity;
+                    if (animations.length > 0 && animations[0].property === "opacity") {
+                        var opacityFrom = animations[0].from.scalar;
+                        var opacityTo = animations[0].to.scalar;
+                        var diff = opacityTo - opacityFrom;
+                        opacity = opacityFrom + diff * this.percentfinished;
+                    } else {
+                        opacity = textureInfo.initialState.opacity;
+                    }
+
+                    this.drawableObjects[i].Opacity = this.parentOpacity * opacity;
+                    this.drawableObjects[i].drawFrame();
+                }
+            } else if (textureInfo.animations.length > 0) {
+                if (this.isCompleted) {
+                    if (!buildOut) {
+                        // if completed, just draw its texture object for better performance
+                        this.drawableObjects[i].Opacity = this.parentOpacity * textureInfo.initialState.opacity;;
+                        this.drawableObjects[i].drawFrame();
+                    }
+                    continue;
+                }
+
+                var width = textureInfo.width;
+                var height = textureInfo.height;
+                var offsetX = textureInfo.offset.pointX;
+                var offsetY = textureInfo.offset.pointY;
+                var viewportWidth = gl.viewportWidth;
+                var viewportHeight = gl.viewportHeight;
+
+                duration /= 1000;
+
+                var percent = percentfinished;
+
+                if (buildOut) {
+                    percent = 1.0 - percent;
+                }
+
+                var minCutoff = buildOut ? 0.25 : 0.5;
+                var cutoff = Math.min(minCutoff, 1.0 / duration);
+
+                if (percent > cutoff) {
+                    var newPercent = (percent - cutoff) / (1 - cutoff);
+                    var alpha = TSUSineMap(Math.min(1.0, 2 * newPercent));
+                    alpha *= this.parentOpacity * textureInfo.initialState.opacity;
+
+                    var drawable = this.drawableObjects[i];
+                    drawable.Opacity = alpha;
+                    drawable.drawFrame();
+                }
+
+                var framebufferDrawable = this.framebufferDrawableObjects[i];
+                var mDrawableFrame = framebufferDrawable.drawableFrame;
+                var mFrameRect = framebufferDrawable.frameRect;
+
+                var orthoOffset = {
+                    "x": textureInfo.offset.pointX - mFrameRect.origin.x,
+                    "y": textureInfo.offset.pointY + height - (mFrameRect.origin.y + mFrameRect.size.height)
+                };
+
+                var bottomPadding = mDrawableFrame.origin.y - mFrameRect.origin.y;
+                var topPadding = mFrameRect.origin.y + mFrameRect.size.height - (mDrawableFrame.origin.y + mDrawableFrame.size.height);
+                orthoOffset.y += (topPadding - bottomPadding);
+
+                // this is slightly different implementation because we do not scale up and down in web
+                var MVPMatrix = this.p_orthoTransformWithScale(1, orthoOffset, mFrameRect);
+
+                // change viewport to match the frame buffer size
+                gl.viewport(0, 0, mFrameRect.size.width, mFrameRect.size.height);
+
+                //bind framebuffer
+                gl.bindFramebuffer(gl.FRAMEBUFFER, framebufferDrawable.buffer);
+
+                //now render the scene
+                gl.clear(gl.COLOR_BUFFER_BIT);
+                gl.enable(gl.BLEND);
+                gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+
+                var flameOpacity = (percentfinished == 0.0 || percentfinished == 1.0 ? 0.0 : 1.0);
+
+                // bind framebuffer texture
+                gl.bindTexture(gl.TEXTURE_2D, framebufferDrawable.texture);
+
+                var flameSystem = this.flameSystems[i];
+                flameSystem.setMVPMatrix(MVPMatrix);
+                gl.uniform1f(uniforms["SpeedMax"], flameSystem._speedMax);
+                flameSystem.drawFrame(percentfinished, flameOpacity);
+
+                // unbind the framebuffer
+                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+                // unbind the texture
+                gl.bindTexture(gl.TEXTURE_2D, null);
+
+                // change viewport back to original size
+                gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+
+                // send result to framebuffer
+                gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+                framebufferDrawable.MVPMatrix = WebGraphics.translateMatrix4(renderer.slideProjectionMatrix, mFrameRect.origin.x, gl.viewportHeight - (mFrameRect.origin.y + mFrameRect.size.height), 0);
+                framebufferDrawable.drawFrame();
+            } else {
+                if (!textureInfo.initialState.hidden) {
+                    this.drawableObjects[i].Opacity = this.parentOpacity * textureInfo.initialState.opacity;
+                    this.drawableObjects[i].drawFrame();
+                }
+            }
+        }
+    }
+});
+
+var KNWebGLTransitionConfetti = Class.create(KNWebGLProgram, {
+    initialize: function($super, renderer, params) {
+        this.programData = {
+            name: "com.apple.iWork.Keynote.KLNConfetti",
+            programNames: ["confetti", "defaultTexture"],
+            effect: params.effect,
+            textures: params.textures
+        };
+
+        $super(renderer, this.programData);
+
+        this.useGravity = this.direction === KNDirection.kKNDirectionGravity ? true : false;
+        this.percentfinished = 0.0;
+
+        this.animationWillBeginWithContext();
+    },
+
+    animationWillBeginWithContext: function(){
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var textures = this.textures;
+        var textureInfo = textures[0];
+        var width = textureInfo.width;
+        var height = textureInfo.height;
+        var viewportWidth = gl.viewportWidth;
+        var viewportHeight = gl.viewportHeight;
+
+        var numParticles = 10000;
+
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+        // create a confetti system
+        this.confettiSystem = new KNWebGLBuildConfettiSystem(
+            renderer,
+            this.program["confetti"],
+            {"width": width, "height": height},
+            {"width": viewportWidth, "height": viewportHeight},
+            this.duration,
+            numParticles,
+            textures[1].texture);
+
+        this.confettiSystem.setMVPMatrix(renderer.slideProjectionMatrix);
+
+        // use default texture shader program for incoming slide
+        var program = this.program["defaultTexture"];
+
+        // enable attribs before binding and set the program to use.
+        KNWebGLUtil.enableAttribs(gl, program);
+
+        var textureCoordinates = [
+            0.0, 0.0,
+            0.0, 1.0,
+            1.0, 0.0,
+            1.0, 1.0,
+        ];
+
+        var boxPosition = [
+            0.0, 0.0, -1.0,
+            0.0, viewportHeight, -1.0,
+            viewportWidth, 0.0, -1.0,
+            viewportWidth, viewportHeight, -1.0,
+        ];
+
+        // setup VBO and FTB
+        this.textureCoordinatesBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.textureCoordinatesBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates), gl.STATIC_DRAW);
+        gl.vertexAttribPointer(program.attribs["TexCoord"], 2, gl.FLOAT, false, 0, 0);
+
+        this.positionBuffer = gl.createBuffer();
+        KNWebGLUtil.bindDynamicBufferWithData(gl, program.attribs["Position"], this.positionBuffer, boxPosition, 3);
+
+        gl.uniformMatrix4fv(program.uniforms["MVPMatrix"], false, renderer.slideOrthoMatrix);
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.uniform1i(program.uniforms["Texture"], 0);
+
+        this.drawFrame(0, 0, 4);
+    },
+
+    drawFrame: function(difference, elapsed, duration) {
+        var gl = this.gl;
+        var viewportWidth = gl.viewportWidth;
+        var viewportHeight = gl.viewportHeight;
+
+        var percentfinished = this.percentfinished;
+        percentfinished += difference / duration;
+
+        if (percentfinished > 1) {
+            percentfinished = 1;
+            this.isCompleted = true;
+        }
+
+        var percent = this.percentfinished = percentfinished;
+        var revPercent = 1 - percent;
+        var myPercent = 1 - revPercent*revPercent*revPercent;
+        myPercent = myPercent*(1-percent*percent) + (1-revPercent*revPercent)*(percent*percent) + percent;
+
+        myPercent *= 0.5;
+        myPercent*= myPercent;
+
+        var scale= 0.75 + (1 - Math.pow(revPercent,4)) * 0.25;
+
+        var quadShaderMVPMatrix = WebGraphics.translateMatrix4(this.renderer.slideProjectionMatrix, viewportWidth / 2, viewportHeight / 2, 0);
+        quadShaderMVPMatrix = WebGraphics.scaleMatrix4(quadShaderMVPMatrix, scale, scale, 1);
+        quadShaderMVPMatrix = WebGraphics.translateMatrix4(quadShaderMVPMatrix, -viewportWidth / 2, -viewportHeight / 2, 0);
+
+        // draw the incoming slide
+        var program = this.program["defaultTexture"];
+        gl.useProgram(program.shaderProgram);
+        gl.uniformMatrix4fv(program.uniforms["MVPMatrix"], false, quadShaderMVPMatrix);
+        this.draw();
+
+        //draw the confetti system frame
+        var finalPercent = 1 - percent;
+        finalPercent = WebGraphics.clamp(finalPercent, 0, 1);
+        myPercent = WebGraphics.clamp(myPercent, 0, 1);
+
+        if (this.useGravity) {
+            var ratio = 1;
+            var MVPMatrix = this.renderer.slideProjectionMatrix;
+
+            MVPMatrix = WebGraphics.translateMatrix4(MVPMatrix, 0, -viewportHeight * 2 * percent * percent * (1.0 - ratio * 0.5), 0);
+            this.confettiSystem.setMVPMatrix(MVPMatrix);
+        }
+
+        this.confettiSystem.drawFrame(myPercent, finalPercent);
+    },
+
+    draw: function() {
+        var gl = this.gl;
+        var program = this.program["defaultTexture"];
+        var attribs = program.attribs;
+        var viewportWidth = gl.viewportWidth;
+        var viewportHeight = gl.viewportHeight;
+
+        gl.useProgram(program.shaderProgram);
+
+        var textureCoordinates = [
+            0.0, 0.0,
+            0.0, 1.0,
+            1.0, 0.0,
+            1.0, 1.0,
+        ];
+
+        var boxPosition = [
+            0.0, 0.0, -1.0,
+            0.0, viewportHeight, -1.0,
+            viewportWidth, 0.0, -1.0,
+            viewportWidth, viewportHeight, -1.0,
+        ];
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.textureCoordinatesBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates), gl.STATIC_DRAW);
+        gl.vertexAttribPointer(attribs["TexCoord"], 2, gl.FLOAT, false, 0, 0);
+
+        KNWebGLUtil.bindDynamicBufferWithData(gl, attribs["Position"], this.positionBuffer, boxPosition, 3);
+
+        // bind incoming texture
+        gl.bindTexture(gl.TEXTURE_2D, this.textures[0].texture);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+});
+
+var KNWebGLBuildConfetti = Class.create(KNWebGLProgram, {
+    initialize: function($super, renderer, params) {
+        var effect = params.effect;
+
+        this.programData = {
+            name: "com.apple.iWork.Keynote.KLNConfetti",
+            programNames: ["confetti"],
+            effect: effect,
+            textures: params.textures
+        };
+
+        $super(renderer, this.programData);
+
+        this.useGravity = this.direction === KNDirection.kKNDirectionGravity ? true : false;
+        this.percentfinished = 0.0;
+
+        // create drawable object for drawing static texture
+        this.drawableObjects = [];
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var texture = params.textures[i];
+            var drawableParams = {
+                effect: effect,
+                textures: [texture]
+            };
+
+            var drawableObject = new KNWebGLDrawable(renderer, drawableParams);
+            this.drawableObjects.push(drawableObject);
+        }
+
+        // set parent opacity from CA baseLayer
+        this.parentOpacity = effect.baseLayer.initialState.opacity;
+
+        // setup requirements
+        this.animationWillBeginWithContext();
+    },
+
+    animationWillBeginWithContext: function() {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var viewportWidth = gl.viewportWidth;
+        var viewportHeight = gl.viewportHeight;
+
+        this.confettiSystems = [];
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var textureInfo = this.textures[i];
+            var width = textureInfo.width;
+            var height = textureInfo.height;
+            var ratio = (height / viewportHeight * width / viewportWidth);
+            ratio = Math.sqrt(Math.sqrt(ratio));
+
+            var numParticles = Math.round(ratio * 10000);
+
+            // create a confetti system
+            var confettiSystem = new KNWebGLBuildConfettiSystem(
+                renderer,
+                this.program["confetti"],
+                {"width": width, "height": height},
+                {"width": viewportWidth, "height": viewportHeight},
+                this.duration,
+                numParticles,
+                textureInfo.texture);
+
+            // set ratio so we don't need to recalculate during draw frame
+            confettiSystem.ratio = ratio;
+
+            this.confettiSystems.push(confettiSystem);
+        }
+    },
+
+    drawFrame: function(difference, elapsed, duration) {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var viewportWidth = gl.viewportWidth;
+        var viewportHeight = gl.viewportHeight;
+
+        // determine the type and direction
+        var buildIn = this.buildIn;
+        var buildOut = this.buildOut;
+
+        var percentfinished = this.percentfinished;
+        percentfinished += difference / duration;
+
+        if (percentfinished > 1) {
+            percentfinished = 1;
+            this.isCompleted = true;
+        }
+
+        this.percentfinished = percentfinished;
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var textureInfo = this.textures[i];
+            var initialState = textureInfo.initialState;
+            var animations = textureInfo.animations;
+
+            if (textureInfo.hasHighlightedBulletAnimation) {
+                if (!initialState.hidden) {
+                    var opacity;
+                    if (animations.length > 0 && animations[0].property === "opacity") {
+                        var opacityFrom = animations[0].from.scalar;
+                        var opacityTo = animations[0].to.scalar;
+                        var diff = opacityTo - opacityFrom;
+                        opacity = opacityFrom + diff * percentfinished;
+                    } else {
+                        opacity = textureInfo.initialState.opacity;
+                    }
+
+                    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+                    this.drawableObjects[i].Opacity = this.parentOpacity * opacity;
+                    this.drawableObjects[i].drawFrame();
+                }
+            } else if (textureInfo.animations.length > 0) {
+                if (this.isCompleted) {
+                    if (buildIn) {
+                        // if completed, just draw its texture object for better performance
+                        this.drawableObjects[i].Opacity = this.parentOpacity * textureInfo.initialState.opacity;;
+                        this.drawableObjects[i].drawFrame();
+                    }
+                    continue;
+                }
+
+                var width = textureInfo.width;
+                var height = textureInfo.height;
+                var percent = buildIn ? 1 - percentfinished : percentfinished;
+
+                var revPercent = 1 - percent;
+                var myPercent = 1 - revPercent * revPercent * revPercent;
+                myPercent = myPercent * (1 - percent * percent) + (1 - revPercent * revPercent) * (percent * percent) + percent;
+                myPercent *= 0.5;
+
+                if (buildIn) {
+                   myPercent *= myPercent;
+                }
+
+                //draw the confetti system frame
+                var confettiSystem = this.confettiSystems[i];
+                var MVPMatrix = WebGraphics.translateMatrix4(renderer.slideProjectionMatrix, textureInfo.offset.pointX,  viewportHeight - (textureInfo.offset.pointY + height), 0);
+
+                var finalPercent = 1 - percent;
+                finalPercent = WebGraphics.clamp(finalPercent, 0, 1);
+                myPercent = WebGraphics.clamp(myPercent, 0, 1);
+
+                if (this.useGravity) {
+                    var ratio = confettiSystem.ratio;
+                    MVPMatrix = WebGraphics.translateMatrix4(MVPMatrix, 0, -viewportHeight * 2 * percent * percent * (1.0 - ratio * 0.5), 0);
+                }
+
+                gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+                confettiSystem.setMVPMatrix(MVPMatrix);
+                confettiSystem.drawFrame(myPercent, finalPercent);
+            } else {
+                if (!textureInfo.initialState.hidden) {
+                    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+                    this.drawableObjects[i].Opacity = this.parentOpacity * textureInfo.initialState.opacity;
+                    this.drawableObjects[i].drawFrame();
+                }
+            }
+        }
+    }
+});
+
+var KNWebGLBuildDiffuse = Class.create(KNWebGLProgram, {
+    initialize: function($super, renderer, params) {
+        var effect = params.effect;
+
+        this.programData = {
+            name: "com.apple.iWork.Keynote.KLNDiffuse",
+            programNames: ["diffuse"],
+            effect: effect,
+            textures: params.textures
+        };
+
+        $super(renderer, this.programData);
+
+        this.percentfinished = 0.0;
+
+        // create drawable object for drawing static texture
+        this.drawableObjects = [];
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var texture = params.textures[i];
+            var drawableParams = {
+                effect: effect,
+                textures: [texture]
+            };
+
+            var drawableObject = new KNWebGLDrawable(renderer, drawableParams);
+            this.drawableObjects.push(drawableObject);
+        }
+
+        // set parent opacity from CA baseLayer
+        this.parentOpacity = effect.baseLayer.initialState.opacity;
+
+        // setup requirements
+        this.animationWillBeginWithContext();
+    },
+
+    animationWillBeginWithContext: function() {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var viewportWidth = gl.viewportWidth;
+        var viewportHeight = gl.viewportHeight;
+
+        this.diffuseSystems = [];
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var textureInfo = this.textures[i];
+            var width = textureInfo.width;
+            var height = textureInfo.height;
+            var ratio = (height / viewportHeight * width / viewportWidth);
+            ratio = Math.sqrt(Math.sqrt(ratio));
+
+            var numParticles = Math.round(ratio * 4000);
+
+            // create a confetti system
+            var diffuseSystem = new KNWebGLBuildDiffuseSystem(
+                renderer,
+                this.program["diffuse"],
+                {"width": width, "height": height},
+                {"width": viewportWidth, "height": viewportHeight},
+                this.duration,
+                numParticles,
+                textureInfo.texture,
+                this.direction === KNDirection.kKNDirectionRightToLeft);
+
+            this.diffuseSystems.push(diffuseSystem);
+        }
+    },
+
+    drawFrame: function(difference, elapsed, duration) {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var viewportWidth = gl.viewportWidth;
+        var viewportHeight = gl.viewportHeight;
+
+        var percentfinished = this.percentfinished;
+        percentfinished += difference / duration;
+
+        if (percentfinished > 1) {
+            percentfinished = 1;
+            this.isCompleted = true;
+        }
+
+        this.percentfinished = percentfinished;
+
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var textureInfo = this.textures[i];
+            var initialState = textureInfo.initialState;
+            var animations = textureInfo.animations;
+
+            if (textureInfo.hasHighlightedBulletAnimation) {
+                if (!initialState.hidden) {
+                    var opacity;
+                    if (animations.length > 0 && animations[0].property === "opacity") {
+                        var opacityFrom = animations[0].from.scalar;
+                        var opacityTo = animations[0].to.scalar;
+                        var diff = opacityTo - opacityFrom;
+                        opacity = opacityFrom + diff * percentfinished;
+                    } else {
+                        opacity = textureInfo.initialState.opacity;
+                    }
+
+                    this.drawableObjects[i].Opacity = this.parentOpacity * opacity;
+                    this.drawableObjects[i].drawFrame();
+                }
+            } else if (textureInfo.animations.length > 0) {
+                var width = textureInfo.width;
+                var height = textureInfo.height;
+                var offsetX = textureInfo.offset.pointX;
+                var offsetY = textureInfo.offset.pointY;
+
+                //draw the diffuse system frame
+                var diffuseSystem = this.diffuseSystems[i];
+                var MVPMatrix = WebGraphics.translateMatrix4(renderer.slideProjectionMatrix, offsetX,  viewportHeight - (offsetY + height), 0);
+
+                diffuseSystem.setMVPMatrix(MVPMatrix);
+                diffuseSystem.drawFrame(this.percentfinished, 1.0);
+            } else {
+                if (!textureInfo.initialState.hidden) {
+                    this.drawableObjects[i].Opacity = this.parentOpacity * textureInfo.initialState.opacity;
+                    this.drawableObjects[i].drawFrame();
+                }
+            }
+        }
+    }
+});
+
+var KNWebGLBuildFireworks = Class.create(KNWebGLProgram, {
+    initialize: function($super, renderer, params) {
+        this.programData = {
+            name: "com.apple.iWork.Keynote.KNFireworks",
+            programNames: ["fireworks"],
+            effect: params.effect,
+            textures: params.textures
+        };
+
+        $super(renderer, this.programData);
+
+        var gl = this.gl;
+
+        // animation parameter group
+        this.animParameterGroup = new KNAnimParameterGroup("Fireworks");
+
+        // bind required textures from base64 image source
+        this.fireworksTexture = KNWebGLUtil.bindTextureWithImage(gl, fireworksImage);
+        this.fireworksCenterBurstTexture = KNWebGLUtil.bindTextureWithImage(gl, fireworksCenterBurstImage);
+
+        // initialize percent finish
+        this.percentfinished = 0;
+        this.prevpercentfinished = 0;
+
+        // create drawable object for drawing static texture
+        this.drawableObjects = [];
+
+        // frame rect for all firework systems
+        this.frameRect = this.frameOfEffectWithFrame();
+
+        this.slideSize = {"width": gl.viewportWidth, "height": gl.viewportHeight};
+
+        var effect = this.effect;
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var texture = params.textures[i];
+            var drawableParams = {
+                effect: effect,
+                textures: [texture]
+            };
+
+            var drawableObject = new KNWebGLDrawable(renderer, drawableParams);
+
+            // push drawable object to drawableObjects array
+            this.drawableObjects.push(drawableObject);
+        }
+
+        // set parent opacity from CA baseLayer
+        this.parentOpacity = effect.baseLayer.initialState.opacity;
+
+        // setup requirements
+        this.animationWillBeginWithContext();
+    },
+
+    frameOfEffectWithFrame: function() {
+        var gl = this.gl;
+        var slideRect = {
+            "origin": {
+                "x": 0,
+                "y": 0
+            },
+            "size": {
+                "width": gl.viewportWidth,
+                "height": gl.viewportHeight
+            }
+        };
+
+        return slideRect;
+    },
+
+    p_orthoTransformWithScale: function(scale, offset, mFrameRect) {
+        var size = {
+            "width": mFrameRect.size.width * scale,
+            "height": mFrameRect.size.height * scale
+        };
+
+        var ortho = WebGraphics.makeOrthoMatrix4(0, size.width, 0, size.height, -1, 1);
+        var result = WebGraphics.translateMatrix4(ortho, offset.x, -offset.y, 0);
+
+        return result;
+    },
+
+    p_setupFBOWithSize: function(size) {
+        this.framebuffer = new TSDGLFrameBuffer(this.gl, size, 2);
+    },
+
+    p_fireworksSystemsForTR: function(textureInfo) {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var viewportWidth = gl.viewportWidth;
+        var viewportHeight = gl.viewportHeight;
+        var duration = this.duration / 1000;
+        var parameterGroup = this.animParameterGroup;
+
+        var numFireworks = duration * parameterGroup.doubleForKey("FireworksCount");
+        // At least 2 fireworks!
+        numFireworks = Math.max(2, numFireworks);
+
+        var systems = [];
+
+        var startOnLeftIndex = 0;
+        var startOnRightIndex = 1;
+        var startImmediatelyIndex = parseInt(WebGraphics.randomBetween(0, numFireworks - 1));
+
+        for (var i = 0; i < numFireworks; i++) {
+            var numParticles = parameterGroup.doubleForKey("ParticleCount");
+            var minSlideSide = Math.min(viewportWidth, viewportHeight);
+            var fireworkSpan = minSlideSide * WebGraphics.doubleBetween(parameterGroup.doubleForKey("FireworkSizeMin"), parameterGroup.doubleForKey("FireworkSizeMax"));
+
+            var particleSystem = new KNWebGLBuildFireworksSystem(
+                renderer,
+                this.program["fireworks"],
+                {"width": textureInfo.width, "height": textureInfo.height},
+                {"width": viewportWidth, "height": viewportHeight},
+                this.duration,
+                {"width": numParticles, "height": 1},
+                {"width": 1, "height": 1},
+                this.fireworksTexture
+            );
+
+            var randomSize = WebGraphics.makeSize(parameterGroup.doubleForKey("ParticleSizeMin"), parameterGroup.doubleForKey("ParticleSizeMax"));
+            randomSize.width = randomSize.width * minSlideSide / 100;
+            randomSize.height = randomSize.height * minSlideSide / 100;
+
+            particleSystem.randomParticleSizeMinMax = randomSize;
+            particleSystem.maxDistance = fireworkSpan;
+            particleSystem.colorRandomness = parameterGroup.doubleForKey("ParticleColorRandomness");
+            particleSystem.lifeSpanMinDuration = parameterGroup.doubleForKey("ParticleLifeSpanMinDuration");
+            particleSystem.randomParticleSpeedMinMax = WebGraphics.makePoint(parameterGroup.doubleForKey("FireworkSpeedMin"), parameterGroup.doubleForKey("FireworkSpeedMax"));
+
+            if (i % 2 === 0) {
+                // 1/2 of particles start in left half
+                particleSystem.fireworkStartingPositionX = WebGraphics.randomBetween(0, 0.5);
+            } else if (i % 2 === 1) {
+                // 1/2 of particles start in right half
+                particleSystem.fireworkStartingPositionX = WebGraphics.randomBetween(0.5, 1);
+            }
+
+            if (i === startOnLeftIndex) {
+                // Make sure at least one burst is all the way on the left side
+                particleSystem.fireworkStartingPositionX = 0;
+            }
+
+            if (i === startOnRightIndex) {
+                // Make sure at least one burst is all the way on the right side
+                particleSystem.fireworkStartingPositionX = 1;
+            }
+
+            // Lifespan/duration of firework
+            var randomDuration = WebGraphics.randomBetween(parameterGroup.doubleForKey("FireworkDurationMin"), parameterGroup.doubleForKey("FireworkDurationMax"));
+
+            randomDuration /= duration;
+
+            var startTime = WebGraphics.randomBetween(0, 1.0 - randomDuration);
+
+            if (i === startImmediatelyIndex) {
+                // Make sure ONE of the fireworks starts right away!
+                startTime = 0;
+            }
+
+            startTime = Math.max(startTime, 0.001);
+
+            particleSystem.lifeSpan = {
+                "start": startTime,
+                "duration": randomDuration
+            };
+
+            particleSystem.setupWithTexture(textureInfo);
+
+            systems.push(particleSystem);
+        }
+
+        return systems;
+    },
+
+    animationWillBeginWithContext: function() {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var parameterGroup = this.animParameterGroup;
+
+        var centerBurstVertexRect = CGRectMake(0, 0, 512, 512);
+        var vertexRect = CGRectMake(0, 0, this.slideSize.width, this.slideSize.height);
+        var textureRect = CGRectMake(0, 0, 1, 1);
+        var meshSize = CGSizeMake(2, 2);
+        var mFrameRect = this.frameRect;
+
+        this.fireworksSystems = [];
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var texture = this.textures[i];
+
+            var orthoOffset = {
+                "x": texture.offset.pointX - mFrameRect.origin.x,
+                "y": texture.offset.pointY + texture.height - (mFrameRect.origin.y + mFrameRect.size.height)
+            };
+
+            var baseOrthoTransform = WebGraphics.makeOrthoMatrix4(0, mFrameRect.size.width, 0, mFrameRect.size.height, -1, 1);
+            var baseTransform = WebGraphics.translateMatrix4(baseOrthoTransform, orthoOffset.x, -orthoOffset.y, 0);
+
+            // init object shader and data buffer
+            var objectShader = new TSDGLShader(gl);
+            objectShader.initWithDefaultTextureAndOpacityShader();
+
+            // object shader set methods
+            objectShader.setMat4WithTransform3D(baseTransform, kTSDGLShaderUniformMVPMatrix);
+            objectShader.setGLint(0, kTSDGLShaderUniformTexture);
+
+            // init object data buffer
+            var objectTextureRect = texture.textureRect;
+            var objectVertexRect = CGRectMake(0, 0, objectTextureRect.size.width, objectTextureRect.size.height);
+            var objectDataBuffer = new TSDGLDataBuffer(gl);
+
+            objectDataBuffer.initWithVertexRect(objectVertexRect, TSDRectUnit, meshSize, false, false);
+
+            // Set up shaders for particle systems
+            var fireworksMVP = renderer.slideProjectionMatrix;
+            fireworksMVP = WebGraphics.translateMatrix4(fireworksMVP, orthoOffset.x, -orthoOffset.y, 0);
+
+            var fireworksSystems = this.p_fireworksSystemsForTR(texture);
+
+            // set up FBO
+            this.p_setupFBOWithSize(mFrameRect.size);
+
+            var fboShader = this.fboShader = new TSDGLShader(gl);
+            fboShader.initWithShaderFileNames("fireworkstrails", "fireworkstrails");
+
+            fboShader.setMat4WithTransform3D(baseOrthoTransform, kTSDGLShaderUniformMVPMatrix);
+            fboShader.setGLint(0, kTSDGLShaderUniformTexture);
+
+            var fboDataBuffer = this.fboDataBuffer = new TSDGLDataBuffer(gl);
+            fboDataBuffer.initWithVertexRect(CGRectMake(0, 0, mFrameRect.size.width, mFrameRect.size.height), TSDRectUnit, meshSize, false, false);
+
+            var centerBurstShader = this.centerBurstShader = new TSDGLShader(gl);
+            centerBurstShader.initWithDefaultTextureAndOpacityShader();
+
+            centerBurstShader.setGLFloat(1.0, kTSDGLShaderUniformOpacity);
+
+            var centerBurstDataBuffer = this.centerBurstDataBuffer = new TSDGLDataBuffer(gl);
+            centerBurstDataBuffer.initWithVertexRect(centerBurstVertexRect, TSDRectUnit, meshSize, false, false);
+
+            var _bloomEffect = this._bloomEffect = new TSDGLBloomEffect(gl);
+            _bloomEffect.initWithEffectSize(mFrameRect.size, parameterGroup.doubleForKey("BloomBlurScale"));
+
+            var fireworksSystem = {
+                "_baseOrthoTransform": baseOrthoTransform,
+                "_baseTransform": baseTransform,
+                "objectShader": objectShader,
+                "objectDataBuffer": objectDataBuffer,
+                "fireworksMVP": fireworksMVP,
+                "systems": fireworksSystems
+            };
+
+            this.fireworksSystems.push(fireworksSystem);
+
+            gl.clearColor(0.0, 0.0, 0.0, 0.0);
+
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+            gl.disable(gl.DEPTH_TEST);
+        }
+    },
+
+    drawFrame: function(difference, elapsed, duration) {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var program = this.program["fireworks"];
+        var uniforms = program.uniforms;
+        var buildOut = this.buildOut;
+        var percentfinished = this.percentfinished;
+        var parameterGroup = this.animParameterGroup;
+        var noiseAmount = parameterGroup.doubleForKey("ParticleTrailsDitherAmount");
+        var noiseMax = parameterGroup.doubleForKey("ParticleTrailsDitherMax");
+        var bloomAmount = parameterGroup.doubleForKey("BloomPower");
+
+        percentfinished += difference / duration;
+
+        if (percentfinished >= 1) {
+            percentfinished = 1;
+            this.isCompleted = true;
+        }
+
+        this.percentfinished = percentfinished;
+
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var textureInfo = this.textures[i];
+            var initialState = textureInfo.initialState;
+            var animations = textureInfo.animations;
+
+            if (textureInfo.hasHighlightedBulletAnimation) {
+                if (!initialState.hidden) {
+                    var opacity;
+                    if (animations.length > 0 && animations[0].property === "opacity") {
+                        var opacityFrom = animations[0].from.scalar;
+                        var opacityTo = animations[0].to.scalar;
+                        var diff = opacityTo - opacityFrom;
+                        opacity = opacityFrom + diff * this.percentfinished;
+                    } else {
+                        opacity = textureInfo.initialState.opacity;
+                    }
+
+                    this.drawableObjects[i].Opacity = this.parentOpacity * opacity;
+                    this.drawableObjects[i].drawFrame();
+                }
+            } else if (textureInfo.animations.length > 0) {
+                if (this.isCompleted) {
+                    if (!buildOut) {
+                        // if completed, just draw its texture object for better performance
+                        this.drawableObjects[i].Opacity = this.parentOpacity * textureInfo.initialState.opacity;
+                        this.drawableObjects[i].drawFrame();
+                    }
+                    continue;
+                }
+
+                var width = textureInfo.width;
+                var height = textureInfo.height;
+                var offsetX = textureInfo.offset.pointX;
+                var offsetY = textureInfo.offset.pointY;
+                var viewportWidth = gl.viewportWidth;
+                var viewportHeight = gl.viewportHeight;
+
+                duration /= 1000;
+
+                var percent = percentfinished;
+
+                var currentGLFramebuffer = TSDGLFrameBuffer.currentGLFramebuffer(gl);
+
+                var fireworksSystem = this.fireworksSystems[i];
+                var objectShader = fireworksSystem.objectShader;
+                var objectDataBuffer = fireworksSystem.objectDataBuffer;
+
+                // Draw the actual object
+                this.p_drawObject(percent, textureInfo, objectShader, objectDataBuffer);
+
+                // Draw particles into FBO to save trails
+                var framebuffer = this.framebuffer;
+                var fboShader = this.fboShader;
+                var fboDataBuffer = this.fboDataBuffer;
+
+                var previousFBOTexture = framebuffer.currentGLTexture();
+                framebuffer.setCurrentTextureToNext();
+                framebuffer.bindFramebuffer();
+
+                // clear current framebuffer texture
+                gl.clear(gl.COLOR_BUFFER_BIT);
+
+                // change viewport to match the frame buffer size
+                gl.viewport(0, 0, framebuffer.size.width, framebuffer.size.height);
+
+                // First, draw existing trails, but faded out a bit
+                // bind previous framebuffer texture so we can take the content and draw into current one
+                gl.bindTexture(gl.TEXTURE_2D, previousFBOTexture);
+
+                var minDuration = parameterGroup.doubleForKey("FireworkDurationMin") / duration;
+                minDuration = Math.min(minDuration / 2.0, 1.0);
+
+                var trailsFadePercent = WebGraphics.clamp((percentfinished - minDuration) / (1.0 - minDuration), 0, 1);
+                var trailsFadeOut = 1.0 - WebGraphics.mix(parameterGroup.doubleForKey("TrailsFadeOutMin"), parameterGroup.doubleForKey("TrailsFadeOutMax"), Math.pow(trailsFadePercent, 2));
+
+                fboShader.setGLFloat(trailsFadeOut, kTSDGLShaderUniformOpacity);
+                fboShader.setGLFloat(noiseAmount, kShaderUniformNoiseAmount);
+                fboShader.setGLFloat(noiseMax, kShaderUniformNoiseMax);
+
+                var noiseSeed = WebGraphics.makePoint(WebGraphics.randomBetween(0, 1), WebGraphics.randomBetween(0, 1));
+                fboShader.setPoint2D(noiseSeed, kShaderUniformNoiseSeed);
+
+                fboDataBuffer.drawWithShader(this.fboShader, true);
+
+                // Draw center burst
+
+                gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+                // need to use fireworks program before drawing particle system
+                gl.useProgram(program.shaderProgram);
+
+                var gravity = parameterGroup.doubleForKey("Gravity");
+                gravity *= Math.min(viewportWidth, viewportHeight) * 0.001;
+                gravity *= duration; // acceleration is per second!
+                gl.uniform1f(uniforms["Gravity"], gravity);
+
+                var minSlideSide = Math.min(viewportWidth, viewportHeight);
+                var startScale = minSlideSide * parameterGroup.doubleForKey("ParticleSizeStart") / 100;
+                gl.uniform1f(uniforms["StartScale"], startScale);
+
+                gl.uniform1f(uniforms["SparklePeriod"], parameterGroup.doubleForKey("SparklePeriod"));
+
+                // draw particle system with percent
+                this.drawParticleSystemsWithPercent(percentfinished, false, 1.0, fireworksSystem);
+
+                // change viewport back to original
+                gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+
+                // done drawing particle into FBO so unbind the framebuffer
+                framebuffer.unbindFramebufferAndBindGLFramebuffer(currentGLFramebuffer);
+
+                // Draw particle trails
+
+                var maxDuration = parameterGroup.doubleForKey("FireworkDurationMax");
+                maxDuration = Math.min(maxDuration, 0.999);
+                var particleOpacityPercent = WebGraphics.clamp((percentfinished - maxDuration) / (1.0 - maxDuration), 0, 1);
+                var particleSystemOpacity = 1.0 - parameterGroup.doubleForAnimationCurve("ParticleTransparency", particleOpacityPercent);
+
+                // apply bloom effect
+                this._bloomEffect.bindFramebuffer();
+
+                gl.clear(gl.COLOR_BUFFER_BIT);
+
+                // draw to bloom effect's _colorFramebuffer
+                fboShader.setGLFloat(particleSystemOpacity, kTSDGLShaderUniformOpacity);
+                fboShader.setGLFloat(0, kShaderUniformNoiseAmount);
+
+                gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+                // bind to current framebuffer texture
+                gl.bindTexture(gl.TEXTURE_2D, framebuffer.currentGLTexture());
+
+                // draw trails FBO to bloom effect FBO
+                fboDataBuffer.drawWithShader(fboShader, true);
+
+                // draw new sparkles into bloom effect FBO
+                gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+                // need to use the program before drawing fireworks particle system
+                gl.useProgram(program.shaderProgram);
+
+                this.drawParticleSystemsWithPercent(percentfinished, true, particleSystemOpacity, fireworksSystem);
+
+                // unbind bloom effect framebuffer and bind to default drawing buffer
+                this._bloomEffect.unbindFramebufferAndBindGLFramebuffer(currentGLFramebuffer);
+
+                // additive blend mode
+                gl.blendFunc(gl.ONE, gl.ONE);
+
+                this._bloomEffect.drawBloomEffectWithMVPMatrix(fireworksSystem._baseOrthoTransform, bloomAmount, currentGLFramebuffer);
+
+                gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+            } else {
+                if (!textureInfo.initialState.hidden) {
+                    this.drawableObjects[i].Opacity = this.parentOpacity * textureInfo.initialState.opacity;
+                    this.drawableObjects[i].drawFrame();
+                }
+            }
+        }
+
+        this.prevpercentfinished = this.percentfinished;
+    },
+
+    p_drawObject: function(percent, textureInfo, objectShader, objectDataBuffer) {
+        var gl = this.gl;
+        var parameterGroup = this.animParameterGroup;
+
+        var beginTime = parameterGroup.doubleForKey("TextOpacityBeginTime");
+        var endTime = parameterGroup.doubleForKey("TextOpacityEndTime");
+
+        percent = WebGraphics.clamp((percent - beginTime) / (endTime - beginTime), 0, 1);
+
+        var opacity = this.parentOpacity * textureInfo.initialState.opacity;
+        opacity *= parameterGroup.doubleForAnimationCurve("TextOpacityTiming", percent);
+
+        objectShader.setGLFloat(opacity, kTSDGLShaderUniformOpacity);
+
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+        gl.bindTexture(gl.TEXTURE_2D, textureInfo.texture);
+
+        objectDataBuffer.drawWithShader(objectShader, true);
+    },
+
+    drawParticleSystemsWithPercent: function(percent, shouldDrawSparkles, particleSystemOpacity, fireworksSystem) {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var program = this.program["fireworks"];
+        var uniforms = program.uniforms;
+        var parameterGroup = this.animParameterGroup;
+        var systems = fireworksSystem.systems;
+        var baseTransform = fireworksSystem._baseTransform;
+        var MVPMatrix = fireworksSystem.fireworksMVP;
+
+        // need to use fireworks program before drawing particle system
+        gl.useProgram(program.shaderProgram);
+
+        gl.uniform1f(uniforms["ShouldSparkle"], shouldDrawSparkles ? 1 : 0);
+
+        for (var i = 0, length = systems.length; i < length; i++) {
+            var particleSystem = systems[i];
+            var lifeSpan = particleSystem.lifeSpan;
+            var systemPercent = (percent - lifeSpan.start) / lifeSpan.duration;
+
+            if (systemPercent <= 0 || systemPercent >= 1) {
+                continue;
+            }
+
+            var systemPercent = WebGraphics.clamp(systemPercent, 0, 1);
+            var prevSystemPercent = (this.prevpercentfinished - lifeSpan.start) / lifeSpan.duration;
+            prevSystemPercent = WebGraphics.clamp(prevSystemPercent, systemPercent / 2, 1);
+
+            var opacity = particleSystemOpacity;
+            if (shouldDrawSparkles) {
+                opacity = 1.0 - parameterGroup.doubleForAnimationCurve("ParticleTransparency", systemPercent);
+            }
+
+            // Also send in previous particle burst timing so we can blur in direction of burst velocity and avoid strobing
+            var prevParticleBurstTiming = parameterGroup.doubleForAnimationCurve("ParticleBurstTiming", prevSystemPercent);
+            var particleBurstTiming = parameterGroup.doubleForAnimationCurve("ParticleBurstTiming", systemPercent);
+
+            gl.uniform1f(uniforms["ParticleBurstTiming"], particleBurstTiming);
+
+            gl.uniform1f(uniforms["PreviousParticleBurstTiming"], prevParticleBurstTiming);
+
+            gl.uniform1f(uniforms["PreviousPercent"], prevSystemPercent);
+
+            if (!shouldDrawSparkles) {
+                // Draw big center burst once at very first frame of Firework... the FBO fading will handle persisting it for a bit
+
+                if (!particleSystem.didDrawCenterBurst) {
+                    gl.bindTexture(gl.TEXTURE_2D, this.fireworksCenterBurstTexture);
+
+                    // Scale is percent of slide size
+                    var scale = gl.viewportHeight / 512;
+                    scale *= WebGraphics.randomBetween(parameterGroup.doubleForKey("CenterBurstScaleMin"), parameterGroup.doubleForKey("CenterBurstScaleMax"));
+
+                    var center = particleSystem._startingPoint;
+
+                    var t = WebGraphics.translateMatrix4(baseTransform, center.x, center.y, 0);
+                    var centerAdjust = WebGraphics.makePoint(-(512 / 2.0 * scale), -(512 / 2.0 * scale));
+
+                    t = WebGraphics.translateMatrix4(t, centerAdjust.x, centerAdjust.y, 0);
+                    t = WebGraphics.scaleMatrix4(t, scale, scale, 1);
+
+                    this.centerBurstShader.setGLFloat(parameterGroup.doubleForKey("CenterBurstOpacity"), kTSDGLShaderUniformOpacity);
+                    this.centerBurstShader.setMat4WithTransform3D(t, kTSDGLShaderUniformMVPMatrix);
+
+                    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+                    this.centerBurstDataBuffer.drawWithShader(this.centerBurstShader, true);
+
+                    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+                    particleSystem.didDrawCenterBurst = true;
+                }
+            }
+
+            // need to use fireworks program before drawing particle system
+            gl.useProgram(program.shaderProgram);
+
+            particleSystem.setMVPMatrix(MVPMatrix);
+
+            particleSystem.drawFrame(systemPercent, opacity);
+        }
+    }
+});
+
+var KNWebGLBuildShimmer = Class.create(KNWebGLProgram, {
+    initialize: function($super, renderer, params) {
+        var effect = params.effect;
+
+        this.programData = {
+            name: "com.apple.iWork.Keynote.KLNShimmer",
+            programNames: ["shimmerObject", "shimmerParticle"],
+            effect: effect,
+            textures: params.textures
+        };
+
+        $super(renderer, this.programData);
+
+        var gl = this.gl;
+
+        this.percentfinished = 0.0;
+
+        // create drawable object for drawing static texture
+        this.drawableObjects = [];
+
+        this.slideOrigin = {"x": 0, "y": 0};
+        this.slideSize = {"width": gl.viewportWidth, "height": gl.viewportHeight};
+        this.slideRect = {
+            "origin": this.slideOrigin,
+            "size": this.slideSize
+        };
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var texture = params.textures[i];
+            var drawableFrame = texture.textureRect;
+
+            var drawableParams = {
+                effect: effect,
+                textures: [texture]
+            };
+
+            var frameRect = this.frameOfEffectWithFrame(drawableFrame);
+            var drawableObject = new KNWebGLDrawable(renderer, drawableParams);
+
+            drawableObject.frameRect = frameRect;
+
+            this.drawableObjects.push(drawableObject);
+        }
+
+        // set parent opacity from CA baseLayer
+        this.parentOpacity = effect.baseLayer.initialState.opacity;
+
+        // setup requirements
+        this.animationWillBeginWithContext();
+    },
+
+    frameOfEffectWithFrame: function(drawableFrame) {
+        var gl = this.gl;
+
+        var minPt = {
+            "x": CGRectGetMinX(drawableFrame),
+            "y": CGRectGetMinY(drawableFrame)
+        };
+
+        var maxPt = {
+            "x": CGRectGetMaxX(drawableFrame),
+            "y": CGRectGetMaxY(drawableFrame)
+        };
+
+        var extraPadding = Math.max(drawableFrame.size.width, drawableFrame.size.height);
+        extraPadding = Math.max(extraPadding, this.slideSize.height / 3.0);
+
+        minPt.y -= extraPadding;
+        maxPt.y += extraPadding;
+
+        minPt.x -= extraPadding;
+        maxPt.x += extraPadding;
+
+        var frameRect = TSDRectWithPoints(minPt, maxPt);
+        frameRect = CGRectIntersection(frameRect, this.slideRect);
+        frameRect = CGRectIntegral(frameRect);
+
+        return frameRect;
+    },
+
+    animationWillBeginWithContext: function() {
+        var renderer = this.renderer;
+
+        // initialize a shimmer effect object for each texture rectangle
+        this.shimmerEffects = [];
+
+        var program = this.program;
+        var slideRect = this.slideRect;
+        var duration = this.duration;
+        var direction = this.direction;
+        var type = this.type;
+        var parentOpacity = this.parentOpacity;
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var texture = this.textures[i];
+            var tr = this.textures[i].textureRect;
+            var frameRect = this.drawableObjects[i].frameRect;
+
+            var orthoOffset = {
+                "x": texture.offset.pointX - frameRect.origin.x,
+                "y": texture.offset.pointY + texture.height - (frameRect.origin.y + frameRect.size.height)
+            };
+
+            var baseOrthoTransform = WebGraphics.makeOrthoMatrix4(0, frameRect.size.width, 0, frameRect.size.height, -1, 1);
+            var baseTransform = WebGraphics.translateMatrix4(baseOrthoTransform, orthoOffset.x, -orthoOffset.y, 0);
+
+            var shimmerEffect = new KNWebGLBuildShimmerEffect(
+                renderer,
+                program,
+                slideRect,
+                texture,
+                frameRect,
+                baseTransform,
+                duration,
+                direction,
+                type,
+                parentOpacity
+            );
+
+            this.shimmerEffects.push(shimmerEffect);
+        }
+    },
+
+    drawFrame: function(difference, elapsed, duration) {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var viewportWidth = gl.viewportWidth;
+        var viewportHeight = gl.viewportHeight;
+
+        var percentfinished = this.percentfinished;
+        percentfinished += difference / duration;
+
+        if (percentfinished > 1) {
+            percentfinished = 1;
+            this.isCompleted = true;
+        }
+
+        this.percentfinished = percentfinished;
+
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var textureInfo = this.textures[i];
+            var initialState = textureInfo.initialState;
+            var animations = textureInfo.animations;
+
+            if (textureInfo.hasHighlightedBulletAnimation) {
+                if (!initialState.hidden) {
+                    var opacity;
+                    if (animations.length > 0 && animations[0].property === "opacity") {
+                        var opacityFrom = animations[0].from.scalar;
+                        var opacityTo = animations[0].to.scalar;
+                        var diff = opacityTo - opacityFrom;
+                        opacity = opacityFrom + diff * percentfinished;
+                    } else {
+                        opacity = textureInfo.initialState.opacity;
+                    }
+
+                    this.drawableObjects[i].Opacity = this.parentOpacity * opacity;
+                    this.drawableObjects[i].drawFrame();
+                }
+            } else if (textureInfo.animations.length > 0) {
+                if (this.isCompleted) {
+                    if (this.buildIn) {
+                        // if completed, just draw its texture object for better performance
+                        this.drawableObjects[i].Opacity = this.parentOpacity * textureInfo.initialState.opacity;
+                        this.drawableObjects[i].drawFrame();
+                    }
+
+                    continue;
+                }
+
+                var width = textureInfo.width;
+                var height = textureInfo.height;
+                var offsetX = textureInfo.offset.pointX;
+                var offsetY = textureInfo.offset.pointY;
+
+                //draw shimmer effect
+                var shimmerEffect = this.shimmerEffects[i];
+                shimmerEffect.renderEffectAtPercent(this.percentfinished);
+            } else {
+                if (!textureInfo.initialState.hidden) {
+                    this.drawableObjects[i].Opacity = this.parentOpacity * textureInfo.initialState.opacity;
+                    this.drawableObjects[i].drawFrame();
+                }
+            }
+        }
+    }
+});
+
+var KNWebGLBuildShimmerEffect = Class.create({
+    initialize: function(renderer, program, slideRect, texture, destinationRect, translate, duration, direction, buildType, parentOpacity) {
+        this.renderer = renderer;
+        this.gl = renderer.gl;
+        this.program = program;
+        this._slideRect = slideRect;
+        this._texture = texture;
+        this._destinationRect = destinationRect;
+        this._translate = translate;
+        this._duration = duration;
+        this._direction = direction;
+        this._buildType = buildType;
+
+        this._baseTransform = new Float32Array(16);
+
+        this._isSetup = false;
+
+        this.parentOpacity = parentOpacity;
+
+        // bind shimmer texture
+        this.shimmerTexture = KNWebGLUtil.bindTextureWithImage(this.gl, shimmerImage);
+
+        this.setupEffectIfNecessary();
+    },
+
+    setupEffectIfNecessary: function() {
+        if (this._isSetup) {
+            return;
+        }
+
+        var gl = this.gl;
+
+        var texture = this._texture;
+        var meshSize = CGSizeMake(2, 2);
+        var mFrameRect = {
+            "origin": {
+                "x": 0,
+                "y": 0
+            },
+            "size": {
+                "width": gl.viewportWidth,
+                "height": gl.viewportHeight
+            }
+        };
+
+        var orthoOffset = {
+            "x": texture.offset.pointX - mFrameRect.origin.x,
+            "y": texture.offset.pointY + texture.height - (mFrameRect.origin.y + mFrameRect.size.height)
+        };
+
+        var baseOrthoTransform = WebGraphics.makeOrthoMatrix4(0, mFrameRect.size.width, 0, mFrameRect.size.height, -1, 1);
+        var baseTransform = this.baseTransform = WebGraphics.translateMatrix4(baseOrthoTransform, orthoOffset.x, -orthoOffset.y, 0);
+
+        this._objectSystem = this.objectSystemForTR(this._texture, this._slideRect, this._duration);
+        this._objectSystem.setMVPMatrix(this.baseTransform);
+
+        // Set up particle particle system
+        if (this._objectSystem.shouldDraw) {
+            // Only set up the particles if we will actually draw this particle system!
+            this._particleSystem = this.particleSystemForTR(this._texture, this._slideRect, this._duration);
+            this._particleSystem.setMVPMatrix(this.baseTransform);
+        }
+
+        this._isSetup = true;
+    },
+
+    p_numberOfParticlesForTR: function(tr, slideRect, duration) {
+        var destRect = this._destinationRect;
+        var slideSize = slideRect.size;
+        var slideRatio = (destRect.size.width / slideSize.width * destRect.size.height / slideSize.height);
+        var texRatio = (tr.size.width / destRect.size.width * tr.size.height / destRect.size.height);
+
+        // create as many particles as possible without hitting our vertex limit
+        var numParticles = parseInt(Math.min((slideRatio * texRatio * 2000), 3276));
+
+        return numParticles;
+    },
+
+    objectSystemForTR: function(texture, slideRect, duration) {
+        var tr = texture.textureRect;
+        var numParticles = this.p_numberOfParticlesForTR(tr, slideRect, duration);
+
+        var particleSystem = new KNWebGLBuildShimmerObjectSystem(
+            this.renderer,
+            this.program["shimmerObject"],
+            {"width": tr.size.width, "height": tr.size.height},
+            {"width": slideRect.size.width, "height": slideRect.size.height},
+            duration,
+            numParticles,
+            texture.texture,
+            this._direction
+        );
+
+        return particleSystem;
+    },
+
+    particleSystemForTR: function(texture, slideRect, duration) {
+        var tr = texture.textureRect;
+        // Extra sparkles at end
+        var extraParticles = this.p_numberOfParticlesForTR(tr, slideRect, duration);
+
+        extraParticles = Math.max(2, extraParticles / 40);
+
+        // Add in sparkles to match object's particles
+        var objectSystemParticleCount = this._objectSystem.particleCount;
+        var numParticles = objectSystemParticleCount;
+
+        numParticles += extraParticles;
+
+        numParticles = Math.min(numParticles, 3276);
+
+        var particleSystem = new KNWebGLBuildShimmerParticleSystem(
+            this.renderer,
+            this.program["shimmerParticle"],
+            {"width": tr.size.width, "height": tr.size.height},
+            {"width": slideRect.size.width, "height": slideRect.size.height},
+            duration,
+            CGSizeMake(numParticles, 1),
+            this._objectSystem.particleSize,
+            this._objectSystem,
+            this.shimmerTexture,
+            this._direction
+        );
+
+        return particleSystem;
+    },
+
+    p_drawObject: function(percent, textureInfo, objectShader, objectDataBuffer) {
+        var gl = this.gl;
+        var opacity = this.parentOpacity * textureInfo.initialState.opacity;
+
+        opacity = opacity * TSUSineMap(percent);
+
+        objectShader.setGLFloat(opacity, kTSDGLShaderUniformOpacity);
+
+        gl.bindTexture(gl.TEXTURE_2D, textureInfo.texture);
+
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+        objectDataBuffer.drawWithShader(objectShader, true);
+    },
+
+    renderEffectAtPercent: function(percent) {
+        var gl = this.gl;
+        var texture = this._texture;
+
+        if (this._buildType === "buildOut") {
+            percent = 1.0 - percent;
+        }
+
+        var accelPercent = (1 - percent) * (1 - percent);
+        var isClockwise = this._buildType === "buildIn";
+
+        var rotation = (TSUReverseSquare(percent) * this._duration/1000 + percent) * Math.PI/2;
+
+        if (!isClockwise) {
+            rotation *= -1.0;
+        }
+
+        // Draw main object as pieces
+        var objectOpacitySpan = WebGraphics.makePoint(0.2, 0.4);
+        var objectOpacity = (percent - objectOpacitySpan.x) / objectOpacitySpan.y;
+
+        objectOpacity = WebGraphics.clamp(objectOpacity, 0.0, 1.0);
+        objectOpacity = TSUSineMap(objectOpacity);
+
+        var opacity = this.parentOpacity * texture.initialState.opacity;
+        objectOpacity *= opacity;
+
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+        // need to use the program before drawing the particle system
+        gl.useProgram(this.program["shimmerObject"].shaderProgram);
+
+        // set MVP Matrix for object system
+        this._objectSystem.setMVPMatrix(this.baseTransform);
+        this._objectSystem.drawGLSLWithPercent(accelPercent, objectOpacity, rotation, isClockwise, texture.texture);
+
+        // Draw shimmers
+
+        // need to use the program before drawing the particle system
+        gl.useProgram(this.program["shimmerParticle"].shaderProgram);
+
+        this._particleSystem.setMVPMatrix(this.baseTransform);
+        this._particleSystem.drawGLSLWithPercent(accelPercent, opacity * 0.5, rotation, isClockwise, this.shimmerTexture);
+    }
+});
+
+var KNWebGLBuildSparkle = Class.create(KNWebGLProgram, {
+    initialize: function($super, renderer, params) {
+        var effect = params.effect;
+
+        this.programData = {
+            name: "com.apple.iWork.Keynote.KLNSparkle",
+            programNames: ["sparkle"],
+            effect: effect,
+            textures: params.textures
+        };
+
+        $super(renderer, this.programData);
+
+        var gl = this.gl;
+
+        this.percentfinished = 0.0;
+
+        // create drawable object for drawing static texture
+        this.drawableObjects = [];
+
+        this.slideOrigin = {"x": 0, "y": 0};
+        this.slideSize = {"width": gl.viewportWidth, "height": gl.viewportHeight};
+        this.slideRect = {
+            "origin": this.slideOrigin,
+            "size": this.slideSize
+        };
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var texture = params.textures[i];
+            var drawableFrame = texture.textureRect;
+
+            var drawableParams = {
+                effect: effect,
+                textures: [texture]
+            };
+
+            var frameRect = this.frameOfEffectWithFrame(drawableFrame);
+            var drawableObject = new KNWebGLDrawable(renderer, drawableParams);
+
+            drawableObject.frameRect = frameRect;
+
+            this.drawableObjects.push(drawableObject);
+        }
+
+        // set parent opacity from CA baseLayer
+        this.parentOpacity = effect.baseLayer.initialState.opacity;
+
+        // setup requirements
+        this.animationWillBeginWithContext();
+    },
+
+    frameOfEffectWithFrame: function(drawableFrame) {
+        var minPt = WebGraphics.makePoint(CGRectGetMinX(drawableFrame), CGRectGetMinY(drawableFrame));
+        var maxPt = WebGraphics.makePoint(CGRectGetMaxX(drawableFrame), CGRectGetMaxY(drawableFrame));
+
+        var extraPadding = Math.max(drawableFrame.size.width, drawableFrame.size.height);
+        // Make sure the width is large enough to deal with floating point precision errors in proj matrix
+        // (Otherwise very small text will look blurry)
+        extraPadding = Math.max(extraPadding, 128);
+
+        minPt.y = Math.max(CGRectGetMinY(this.slideRect), minPt.y - extraPadding);
+        maxPt.y = Math.min(CGRectGetMaxY(this.slideRect), maxPt.y + extraPadding);
+
+        minPt.x = Math.max(CGRectGetMinX(this.slideRect), minPt.x - extraPadding);
+        maxPt.x = Math.min(CGRectGetMaxX(this.slideRect), maxPt.x + extraPadding);
+
+        var frameRect = TSDRectWithPoints(minPt, maxPt);
+        frameRect = CGRectIntegral(frameRect);
+
+        return frameRect;
+    },
+
+    animationWillBeginWithContext: function() {
+        var renderer = this.renderer;
+
+        // initialize a shimmer effect object for each texture rectangle
+        this.sparkleEffects = [];
+
+        var program = this.program;
+        var slideRect = this.slideRect;
+        var duration = this.duration;
+        var direction = this.direction;
+        var type = this.type;
+        var parentOpacity = this.parentOpacity;
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var texture = this.textures[i];
+            var direction = this.direction;
+            var tr = this.textures[i].textureRect;
+            var frameRect = this.drawableObjects[i].frameRect;
+
+            var orthoOffset = {
+                "x": texture.offset.pointX - frameRect.origin.x,
+                "y": texture.offset.pointY + texture.height - (frameRect.origin.y + frameRect.size.height)
+            };
+
+            var baseOrthoTransform = WebGraphics.makeOrthoMatrix4(0, frameRect.size.width, 0, frameRect.size.height, -1, 1);
+            var baseTransform = WebGraphics.translateMatrix4(baseOrthoTransform, orthoOffset.x, -orthoOffset.y, 0);
+
+            var sparkleEffect = new KNWebGLBuildSparkleEffect(
+                renderer,
+                program,
+                slideRect,
+                texture,
+                frameRect,
+                baseTransform,
+                duration,
+                direction,
+                type,
+                parentOpacity
+            );
+
+            this.sparkleEffects.push(sparkleEffect);
+        }
+    },
+
+    drawFrame: function(difference, elapsed, duration) {
+        var renderer = this.renderer;
+        var gl = this.gl;
+        var viewportWidth = gl.viewportWidth;
+        var viewportHeight = gl.viewportHeight;
+
+        // determine the type and direction
+        var buildIn = this.buildIn;
+        var buildOut = this.buildOut;
+
+        var percentfinished = this.percentfinished;
+        percentfinished += difference / duration;
+
+        if (percentfinished > 1) {
+            percentfinished = 1;
+            this.isCompleted = true;
+        }
+
+        this.percentfinished = percentfinished;
+
+        for (var i = 0, length = this.textures.length; i < length; i++) {
+            var textureInfo = this.textures[i];
+            var initialState = textureInfo.initialState;
+            var animations = textureInfo.animations;
+
+            if (textureInfo.hasHighlightedBulletAnimation) {
+                if (!initialState.hidden) {
+                    var opacity;
+                    if (animations.length > 0 && animations[0].property === "opacity") {
+                        var opacityFrom = animations[0].from.scalar;
+                        var opacityTo = animations[0].to.scalar;
+                        var diff = opacityTo - opacityFrom;
+                        opacity = opacityFrom + diff * percentfinished;
+                    } else {
+                        opacity = textureInfo.initialState.opacity;
+                    }
+
+                    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+                    this.drawableObjects[i].Opacity = this.parentOpacity * opacity;
+                    this.drawableObjects[i].drawFrame();
+                }
+            } else if (textureInfo.animations.length > 0) {
+                if (this.isCompleted) {
+                    if (buildIn) {
+                        // if completed, just draw its texture object for better performance
+                        this.drawableObjects[i].Opacity = this.parentOpacity * textureInfo.initialState.opacity;;
+                        this.drawableObjects[i].drawFrame();
+                    }
+                    continue;
+                }
+
+                //draw shimmer effect
+                var sparkleEffect = this.sparkleEffects[i];
+                sparkleEffect.renderEffectAtPercent(this.percentfinished);
+            } else {
+                if (!textureInfo.initialState.hidden) {
+                    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+                    this.drawableObjects[i].Opacity = this.parentOpacity * textureInfo.initialState.opacity;
+                    this.drawableObjects[i].drawFrame();
+                }
+            }
+        }
+    }
+});
+
+var KNWebGLBuildSparkleEffect = Class.create({
+    initialize: function(renderer, program, slideRect, texture, destinationRect, translate, duration, direction, buildType, parentOpacity) {
+        this.renderer = renderer;
+        this.gl = renderer.gl;
+        this.program = program;
+        this._slideRect = slideRect;
+        this._texture = texture;
+        this._destinationRect = destinationRect;
+        this._translate = translate;
+        this._duration = duration;
+        this._direction = direction;
+        this._buildType = buildType;
+
+        this._baseTransform = new Float32Array(16);
+
+        this._isSetup = false;
+
+        this.parentOpacity = parentOpacity;
+
+        // bind shimmer texture
+        this.sparkleTexture = KNWebGLUtil.bindTextureWithImage(this.gl, sparkleImage);
+
+        this.setupEffectIfNecessary();
+    },
+
+    setupEffectIfNecessary: function() {
+        if (this._isSetup) {
+            return;
+        }
+
+        var gl = this.gl;
+
+        var texture = this._texture;
+        var meshSize = CGSizeMake(2, 2);
+        var mFrameRect = {
+            "origin": {
+                "x": 0,
+                "y": 0
+            },
+            "size": {
+                "width": gl.viewportWidth,
+                "height": gl.viewportHeight
+            }
+        };
+
+        var orthoOffset = {
+            "x": texture.offset.pointX - mFrameRect.origin.x,
+            "y": texture.offset.pointY + texture.height - (mFrameRect.origin.y + mFrameRect.size.height)
+        };
+
+        var baseOrthoTransform = WebGraphics.makeOrthoMatrix4(0, mFrameRect.size.width, 0, mFrameRect.size.height, -1, 1);
+        var baseTransform = this.baseTransform = WebGraphics.translateMatrix4(baseOrthoTransform, orthoOffset.x, -orthoOffset.y, 0);
+
+        // init object shader and data buffer
+        var objectShader = this._objectShader = new TSDGLShader(gl);
+        objectShader.initWithDefaultTextureAndOpacityShader();
+
+        // object shader set methods
+        objectShader.setMat4WithTransform3D(baseTransform, kTSDGLShaderUniformMVPMatrix);
+        objectShader.setGLint(0, kTSDGLShaderUniformTexture);
+
+        // new data buffer attributes
+        var objectPositionAttribute = new TSDGLDataBufferAttribute(kTSDGLShaderAttributePosition, GL_STREAM_DRAW, GL_FLOAT, false, 2);
+        var objectTexCoordAttribute = new TSDGLDataBufferAttribute(kTSDGLShaderAttributeTexCoord, GL_STREAM_DRAW, GL_FLOAT, false, 2);
+
+        // init object data buffer
+        var objectDataBuffer = this._objectDataBuffer = new TSDGLDataBuffer(gl);
+
+        objectDataBuffer.newDataBufferWithVertexAttributes([objectPositionAttribute, objectTexCoordAttribute] , meshSize, true);
+
+        // Set up sparkle particle system
+        this.sparkleSystem = this.sparkleSystemForTR(this._texture, this._slideRect, this._duration);
+        this.sparkleSystem.setMVPMatrix(this.baseTransform);
+        this.sparkleSystem.setColor(new Float32Array([1, 1, 1, 1]));
+
+        this._isSetup = true;
+    },
+
+    p_numberOfParticlesForTR: function(tr, slideRect, duration) {
+        var destRect = this._destinationRect;
+        var slideSize = slideRect.size;
+        var slideRatio = (destRect.size.width / slideSize.width * destRect.size.height / slideSize.height);
+        var texRatio = (tr.size.width / destRect.size.width * tr.size.height / destRect.size.height);
+
+        // create as many particles as possible without hitting our vertex limit
+        var numParticles = parseInt(Math.min((slideRatio * texRatio * 2000), 3276));
+
+        return numParticles;
+    },
+
+    sparkleSystemForTR: function(texture, slideRect, duration) {
+        var tr = texture.textureRect;
+        var slideSize = this._slideRect.size;
+        var boundingRect = this._destinationRect;
+
+        var slideRatio = Math.min(boundingRect.size.width, slideSize.width) / slideSize.width * Math.min(boundingRect.size.height, slideSize.height) / slideSize.height;
+
+        var numParticles = parseInt(((2 - Math.sqrt(slideRatio)) / 2) * 1500 * this._duration / 1000);
+
+        var sparkleSystem = new KNWebGLBuildSparkleSystem(
+            this.renderer,
+            this.program["sparkle"],
+            {"width": tr.size.width, "height": tr.size.height},
+            {"width": slideRect.size.width, "height": slideRect.size.height},
+            duration,
+            CGSizeMake(numParticles, 1),
+            {"width": 128, "height": 128},
+            this.sparkleTexture,
+            this._direction
+        );
+
+        return sparkleSystem;
+    },
+
+    p_drawObject: function(percent, textureInfo, objectShader, objectDataBuffer) {
+        var gl = this.gl;
+        var opacity = this.parentOpacity * textureInfo.initialState.opacity;
+
+        opacity = opacity * TSUSineMap(percent);
+
+        objectShader.setGLFloat(opacity, kTSDGLShaderUniformOpacity);
+
+        gl.bindTexture(gl.TEXTURE_2D, textureInfo.texture);
+
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+        objectDataBuffer.drawWithShader(objectShader, true);
+    },
+
+    renderEffectAtPercent: function(percent) {
+        var gl = this.gl;
+        var texture = this._texture;
+        var direction = this._direction;
+        var tr = texture.textureRect;
+
+        var isReverse = (direction == KNDirection.kKNDirectionRightToLeft || direction == KNDirection.kKNDirectionTopToBottom);
+        var isHorizontal = (direction == KNDirection.kKNDirectionRightToLeft || direction == KNDirection.kKNDirectionLeftToRight);
+
+        var mvpMatrix = this._translate;
+        var alpha = this.parentOpacity * texture.initialState.opacity;
+
+        // CONSTANTS
+        var duration = this._duration / 1000;
+        var blurWidth = 0.2 / duration;
+        var width = tr.size.width;
+        var height = tr.size.height;
+        // =========
+
+        // FIRST, we draw the original image fading out
+        var particleTiming = KNSparkleMaxParticleLife / Math.max(0.75, duration);
+        var opaqueWidth = percent / (1. - particleTiming);
+        var xStart = 0, yStart = 0, xEnd = 0, yEnd = 0, xTexStart = 0, yTexStart = 0, xTexEnd = 0, yTexEnd = 0;
+
+        if (this._buildType == "buildOut") {
+            opaqueWidth -= blurWidth;
+            xStart = (isHorizontal) ? ((isReverse) ? 0 : width) : 0;
+            yStart = (isHorizontal) ? 0 : ((isReverse) ? 0 : height);
+            xEnd = (isHorizontal) ? ((isReverse) ? width - (width * WebGraphics.clamp(opaqueWidth, 0, 1)) : width * WebGraphics.clamp(opaqueWidth, 0, 1)) : width;
+            yEnd = (isHorizontal) ? height : ((isReverse) ? height - (height * WebGraphics.clamp(opaqueWidth, 0, 1)) : (height * WebGraphics.clamp(opaqueWidth, 0, 1)));
+            xTexStart = (isHorizontal) ? ((isReverse) ? 0 : 1) : 0;
+            yTexStart = (isHorizontal) ? 0 : ((isReverse) ? 0 : 1);
+            xTexEnd = (isHorizontal) ? ((isReverse) ? 1 - (1 * WebGraphics.clamp(opaqueWidth, 0, 1)) : (1 * WebGraphics.clamp(opaqueWidth, 0, 1))) : 1;
+            yTexEnd = (isHorizontal) ? 1 : ((isReverse) ? 1 - (1 * WebGraphics.clamp(opaqueWidth, 0, 1)) : (1 * WebGraphics.clamp(opaqueWidth, 0, 1)));
+        } else {
+            opaqueWidth -= blurWidth;
+            xStart = (isHorizontal) ? ((isReverse) ? width : 0) : 0;
+            yStart = (isHorizontal) ? 0 : ((isReverse) ? height : 0);
+            xEnd = (isHorizontal) ? ((isReverse) ? width - (width * WebGraphics.clamp(opaqueWidth, 0, 1)) : width * WebGraphics.clamp(opaqueWidth, 0, 1)) : width;
+            yEnd = (isHorizontal) ? height : ((isReverse) ? height - (height * WebGraphics.clamp(opaqueWidth, 0, 1)) : height * WebGraphics.clamp(opaqueWidth, 0, 1));
+            xTexStart = (isHorizontal) ? ((isReverse) ? 1 : 0) : 0;
+            yTexStart = (isHorizontal) ? 0 : ((isReverse) ? 1 : 0);
+            xTexEnd = (isHorizontal) ? ((isReverse) ? 1 - (1 * WebGraphics.clamp(opaqueWidth, 0, 1)) : 1 * WebGraphics.clamp(opaqueWidth, 0, 1)) : 1;
+            yTexEnd = (isHorizontal) ? 1 : ((isReverse) ? 1 - (1 * WebGraphics.clamp(opaqueWidth, 0, 1)) : 1 * WebGraphics.clamp(opaqueWidth, 0, 1));
+        }
+
+        gl.bindTexture(gl.TEXTURE_2D, texture.texture);
+
+        this._objectShader.setGLFloat(alpha, kTSDGLShaderUniformOpacity);
+
+        // update data buffer position and text coord
+        var objectDataBuffer = this._objectDataBuffer;
+        var objectPositionAttribute = objectDataBuffer.vertexAttributeNamed(kTSDGLShaderAttributePosition);
+        var objectTexCoordAttribute = objectDataBuffer.vertexAttributeNamed(kTSDGLShaderAttributeTexCoord);
+
+        objectDataBuffer.setGLPoint2D(WebGraphics.makePoint(xStart, yStart), objectPositionAttribute, 0);
+        objectDataBuffer.setGLPoint2D(WebGraphics.makePoint(xEnd, yStart), objectPositionAttribute, 1);
+        objectDataBuffer.setGLPoint2D(WebGraphics.makePoint(xStart, yEnd), objectPositionAttribute, 2);
+        objectDataBuffer.setGLPoint2D(WebGraphics.makePoint(xEnd, yEnd), objectPositionAttribute, 3);
+
+        objectDataBuffer.setGLPoint2D(WebGraphics.makePoint(xTexStart, yTexStart), objectTexCoordAttribute, 0);
+        objectDataBuffer.setGLPoint2D(WebGraphics.makePoint(xTexEnd, yTexStart), objectTexCoordAttribute, 1);
+        objectDataBuffer.setGLPoint2D(WebGraphics.makePoint(xTexStart, yTexEnd), objectTexCoordAttribute, 2);
+        objectDataBuffer.setGLPoint2D(WebGraphics.makePoint(xTexEnd, yTexEnd), objectTexCoordAttribute, 3);
+
+        objectDataBuffer.drawWithShader(this._objectShader, true);
+
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+        // need to use the program before drawing the particle system
+        gl.useProgram(this.program["sparkle"].shaderProgram);
+
+        //this.sparkleSystem.setMVPMatrix(this.baseTransform);
+        this.sparkleSystem.drawFrame(percent, 1.0);
+    }
+});
