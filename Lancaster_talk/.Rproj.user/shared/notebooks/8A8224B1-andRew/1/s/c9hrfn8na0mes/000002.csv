@@ -1,0 +1,15 @@
+"0","url1 <- ""https://query.data.world/s/tw3oaknxjlqods27xzzbpa3do4rmfr"""
+"0","p1f <- tempfile()"
+"0","download.file(url1, p1f, mode=""wb"")"
+"2","trying URL 'https://query.data.world/s/tw3oaknxjlqods27xzzbpa3do4rmfr'
+"
+"2","downloaded 494 KB
+
+"
+"0","happy_data <- read_excel(path = p1f)"
+"1",""
+"1","-"
+"1",""
+"1","/"
+"1","                                                                                                               "
+"1",""

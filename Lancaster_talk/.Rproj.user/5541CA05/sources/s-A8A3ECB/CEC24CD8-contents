@@ -1,0 +1,57 @@
+library(tidyverse)
+library(gganimate)
+
+source("https://gist.githubusercontent.com/ajstewartlang/6c4cd8ab9e0c27747424acdfb3b4cff6/raw/fb53bd97121f7f9ce947837ef1a4c65a73bffb3f/geom_flat_violin.R")
+
+set.seed(3)
+all_data <- NULL
+sample_size <- 20
+
+for(sample in 1:10) {
+ID <- rep(seq(1:sample_size), 2)
+Simple <- as.integer(rnorm(sample_size, mean = 2000, sd = 150))
+Complex <- as.integer(rnorm(sample_size, mean = 2000, sd = 150))
+Condition <- c(rep("Simple", sample_size), rep("Complex", sample_size))
+data_long <- tibble(ID, Condition, c(Simple, Complex), sample)
+colnames(data_long)[3] <- "RT"
+
+all_data <- rbind(all_data, data_long)}
+
+raincloud_theme = theme(
+  text = element_text(size = 12),
+  axis.title.x = element_text(size = 12),
+  axis.title.y = element_text(size = 12),
+  axis.text = element_text(size = 12),
+  axis.text.x = element_text(angle = 45, vjust = 0.5),
+  legend.title = element_text(size = 12),
+  legend.text = element_text(size = 12),
+  legend.position = "right",
+  plot.title = element_text(lineheight = .8, face = "bold", size = 16),
+  panel.border = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.grid.major = element_blank(),
+  axis.line.x = element_line(colour = 'black', size = 0.5, linetype = 'solid'),
+  axis.line.y = element_line(colour = 'black', size = 0.5, linetype = 'solid'))
+
+lb <- function(x) mean(x) - sd(x)
+ub <- function(x) mean(x) + sd(x)
+
+sumld <- plyr::ddply(all_data , ~ Condition, summarise, mean = mean(RT), median = median(RT), 
+                     lower = lb(RT), upper = ub(RT))
+
+ggplot(all_data , aes(y = RT, x = Condition, fill = Condition)) +
+  geom_flat_violin(position = position_nudge(x = .2, y = 0), alpha = .8, trim=FALSE) +
+  geom_point(aes(y = RT, color = Condition), position = position_jitter(width = .15), size = .5, alpha = 0.8) +
+  geom_boxplot(width = .1,  outlier.shape = NA, alpha = 0.5) +
+  expand_limits(x = 3) +
+  guides(fill = FALSE) +
+  guides(color = FALSE) +
+  scale_color_brewer(palette = "Accent") +
+  scale_fill_brewer(palette = "Accent") +
+  coord_flip() +
+  theme_bw() +
+  raincloud_theme +
+  scale_y_continuous(breaks = seq(1500, 3000,by = 200)) +
+  transition_states(sample, transition_length = 1, state_length = 1)  + 
+  labs(title = paste("Sample size: ", sample_size), 
+       subtitle = "Sample number: {closest_state}", x = NULL) 

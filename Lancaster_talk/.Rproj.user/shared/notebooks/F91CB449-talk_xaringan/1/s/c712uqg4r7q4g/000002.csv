@@ -1,0 +1,5 @@
+"0","Subject <- seq(1:80)"
+"0","Group <- factor(rep(1,80))"
+"0","set.seed(1234)"
+"0","RT <- c(rnorm(40,500,200), rnorm(40,1900,200))"
+"0","data1 <- tibble(Subject, Group, RT)"

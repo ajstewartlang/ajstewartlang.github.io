@@ -1,0 +1,6 @@
+"0","happy_data %>% "
+"0","  group_by(country) %>%"
+"0","  ggplot(aes(x = `Life Ladder`)) + "
+"0","  geom_histogram() + "
+"0","  theme_fivethirtyeight() +"
+"0","  labs(x = ""Happiness Index Score"", y = ""Count"", title = ""Histogram of Happiness Index Scores"") "
