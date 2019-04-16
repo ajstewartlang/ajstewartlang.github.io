@@ -6,4 +6,4 @@ http://ajstewartlang.github.io/Hackathon/index
 
 http://ajstewartlang.github.io/Afternoon_workshop
 
-http://ajstewartlang.github.io/Lancaster_talk_June_19/talk_xaringahn
+http://ajstewartlang.github.io/Lancaster_talk_June_19/talk_xaringan
