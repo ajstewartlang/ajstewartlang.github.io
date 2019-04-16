@@ -6,4 +6,4 @@ http://ajstewartlang.github.io/Hackathon/index
 
 http://ajstewartlang.github.io/Afternoon_workshop
 
-http://ajstewartlang.github.io/Lancaster_talk_data_viz
+http://ajstewartlang.github.io/Lancaster_talk_data_viz.pdf
