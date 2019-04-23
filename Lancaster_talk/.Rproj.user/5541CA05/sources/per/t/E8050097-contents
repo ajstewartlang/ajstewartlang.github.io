@@ -2,7 +2,7 @@
 title: "Reproducible Data Visualisations"
 subtitle: ""
 author: "Andrew Stewart<br>University of Manchester<br><br>Twitter: @ajstewart_lang<br>GitHub: github.com/ajstewartlang"
-date: "04/06/19"
+date: "(updated: `r Sys.Date()`)"
 output:
   xaringan::moon_reader:
     lib_dir: libs
@@ -40,7 +40,8 @@ library(rtweet)
 library(leaflet)
 library(RColorBrewer)
 library(bbplot)
-
+library(grid)
+library(MASS)
 ```
 class: center
 # Science that can be replicated <i>vs.</i> science that can be reproduced
@@ -115,10 +116,11 @@ knitr::include_graphics("meme.png")
 ---
 # A workflow for reproducible science in the Tidyverse
 
+.center[
 ```{r, echo=FALSE, out.width="90%"}
 knitr::include_graphics("tidyverse.png")
 ```
-
+]
 ---
 # A workflow for reproducible science in the Tidyverse
 
@@ -278,12 +280,17 @@ If we only plotted and reported information related to aggregated data, we would
 # Reasons for visualising data
 
 --
+
 For yourself - once you have collected your data, you should visualise it before you build any statistical models - does the data look (roughly) as expected with the right number of data points?
 
+--
 
+For others - when you present your work in a talk, on a poster, or in a published paper you want the viewer to be able to quickly and unambiguously extract the intended meaning from your visualisation.  
 
 --
-For others - when you present your work in a talk, on a poster, or in a published paper you want the viewer to be able to quickly and unambiguously extract the intended meaning from your visualisation.  
+
+Just as the reproducibilty of statistical models is important in the context of engaging open and reproducible science, so too is the reproducibilty of data visualisations.
+
 
 ---
 
@@ -565,7 +572,7 @@ data_long %>%
   geom_jitter(width = .1, colour = "black", alpha = .5) +
   coord_flip() +
   guides(colour = FALSE) +
-  theme_economist(base_size = 15) +
+  theme_economist(base_size = 20) +
   ggtitle("Economist theme")
 
 ```
@@ -581,14 +588,14 @@ data_long %>%
   geom_jitter(width = .1, colour = "black", alpha = .5) +
   coord_flip() +
   guides(colour = FALSE) +
-  theme_fivethirtyeight(base_size = 15) +
+  theme_fivethirtyeight(base_size = 20) +
   ggtitle("Fivethirtyeight theme")
 ```
 
 ---
 class: center, middle
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, fig.retina=2}
 
 data_long %>%
   ggplot(aes(x = Condition, y = RT, colour = Condition)) +
@@ -597,7 +604,7 @@ data_long %>%
   geom_jitter(width = .1, colour = "black", alpha = .5) +
   coord_flip() +
   guides(colour = FALSE) +
-  theme_tufte(base_size = 15) +
+  theme_tufte(base_size = 20) +
   ggtitle("Tufte theme")
 
 ```
@@ -613,20 +620,20 @@ data_long %>%
   geom_jitter(width = .1, colour = "black", alpha = .5) +
   coord_flip() +
   guides(colour = FALSE) +
-  theme_solarized(base_size = 15) +
+  theme_solarized(base_size = 20) +
   ggtitle("Solarized theme")
 ```
 ---
 # The BBC Cookbook
 
-The BBC (like many other organisations like the FT) use R and ggplot to generate their data visualisations.  They have even published their own style guide and code for their BBC data visualisation theme.
+The BBC (like many other organisations such as the FT) use R and ggplot to generate their data They have even published their own style guide and code for their BBC data visualisation theme.
 
 https://bbc.github.io/rcookbook/
-
+.center[
 ```{r, echo=FALSE, out.width="80%"}
 knitr::include_graphics("bbc.png")
 ```
-
+]
 ---
 
 class: middle, center
@@ -874,8 +881,7 @@ wordcloud(words = text_waroftheworlds_count$word,
 ]]
 
 ---
-class: center, middle
-```{r}
+```{r, eval=FALSE}
 set.seed(1234)
 wordcloud(words = text_waroftheworlds_count$word, 
           freq = text_waroftheworlds_count$n, min.freq = 1,
@@ -884,6 +890,16 @@ wordcloud(words = text_waroftheworlds_count$word,
           rot.per = 0.35, colors = brewer.pal(8, "Dark2"))
 ```
 
+.center[
+```{r, echo=FALSE}
+set.seed(1234)
+wordcloud(words = text_waroftheworlds_count$word, 
+          freq = text_waroftheworlds_count$n, min.freq = 1,
+          scale = c(3, 1), 
+          max.words = 125, random.order = FALSE, 
+          rot.per = 0.35, colors = brewer.pal(8, "Dark2"))
+```
+]
 ---
 # Sentiment Analyis
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
@@ -894,6 +910,7 @@ word_counts <- text_waroftheworlds %>%
   count(word, sentiment, sort = TRUE)
 ```
 
+.center[
 ```{r, echo=FALSE, fig.width=10, fig.height=6}
 word_counts %>% 
   filter(n > 20) %>%
@@ -905,6 +922,7 @@ word_counts %>%
   labs(y = "Contribution to sentiment", 
        title = "Sentiment Analysis of words in The War of the Worlds") 
 ```
+]
 
 ---
 ```{r, eval=FALSE, message=FALSE}
@@ -932,34 +950,47 @@ word_counts %>%
 Scraping Twitter for everyone's favourite progressive Swedish death metal band, Opeth! 🤘  
 
 <p>
-```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.height=6, fig.width=8}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 rt <- search_tweets("Opeth", n = 1000, include_rts = FALSE, retryonratelimit = TRUE)
 rt1 <- separate(data = rt, col = created_at, into = c("date", "time"), sep = " ") 
 rt1 <- rt1[!is.na(rt1$date),]
 rt1$date <- as.factor(rt1$date)
 data <- rt1
-
-ggplot(data, aes (x = date)) + 
-  geom_bar(fill = "blue") + 
-  scale_y_continuous(expand = c(0,0), limits = c(0,200)) + 
-  labs(x = "Day", y = "Number of Tweets") + 
-  ggtitle("Tweets Mentioning Opeth") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
+.center[
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.height=6, fig.width=8}
+img <- jpeg::readJPEG("opeth.jpg")
+g <- rasterGrob(img, interpolate=TRUE) 
+
+ggplot(data, aes (x = date)) + 
+  annotation_custom(g, xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf) +
+  geom_bar(fill = "white", alpha = .5) + 
+  scale_y_continuous(expand = c(0,0), limits = c(0, 250)) + 
+  labs(x = "Day", y = "Number of Tweets") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Tweets Mentioning Opeth") 
+```
+]
 ---
 class: centre
+
 # Geospatial Plotting of Tweets
 
-```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.height=6, fig.width=8}
+```{r, echo=FALSE}
 mymap <- lat_lng(rt)
 
 m <- leaflet(mymap) %>% 
   addTiles()
+```
 
+.center[
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.height=6, fig.width=8}
 m %>% addCircles(lng = ~lng, lat = ~lat, weight = 8, radius = 40, 
                  color = "#fb3004", stroke = TRUE, fillOpacity = 0.8)
 ```
+]
+
 ---
 class: middle, center
 # Teaching with Animations
@@ -1009,7 +1040,8 @@ paste("Games where Team A scores fewer goals than Team B: ", nrow(filter(all_gam
 paste("Games where there is a tie : ", nrow(filter(all_games, team_a_goals == team_b_goals)))
 ```
 
-```{r, echo=FALSE, eval=FALSE}
+.center[
+```{r, echo=FALSE}
 all_games <- all_games %>% 
   mutate(team_a_wins = team_a_goals > team_b_goals,
          team_b_wins = team_b_goals > team_a_goals) 
@@ -1025,7 +1057,7 @@ small_data <- tibble(c(all_games$team_a_wins, all_games$team_b_wins),
 colnames(small_data) <- c("Points", "Team", "Game")
 
 small_data %>% 
-  fgplot(aes(x = Points, y = Game, group = Team, colour = Team)) +
+  ggplot(aes(x = Points, y = Game, group = Team, colour = Team)) +
   geom_point() +
   geom_line(size = 2) + 
   coord_flip() +
@@ -1036,7 +1068,7 @@ small_data %>%
        y = "Game number") +
   theme(text = element_text(size = 15))
 ```
-
+]
 ---
 # Illustrating sampling error with animations
 On the left N=20 from the <b>same</b> population. We <b>appear</b> to find differences between our conditions. On the right when N=500 it's clear the two conditions are equivalent.
@@ -1098,6 +1130,7 @@ ggplot(all_data , aes(y = RT, x = Condition, fill = Condition)) +
        subtitle = "Sample number: {closest_state}", x = NULL) 
 ```
 ]
+
 .pull-right[
 ```{r, echo=FALSE}
 source("https://gist.githubusercontent.com/ajstewartlang/6c4cd8ab9e0c27747424acdfb3b4cff6/raw/fb53bd97121f7f9ce947837ef1a4c65a73bffb3f/geom_flat_violin.R")
@@ -1157,30 +1190,133 @@ ggplot(all_data , aes(y = RT, x = Condition, fill = Condition)) +
 ```
 ]
 ---
-# Sample size and population r=.5
+# Sample size of 25 when population r = .5
+
+.center[
+```{r, echo=FALSE}
+mu <- c(1000, 2000) 
+myr <- 35.35534
+mysigma <- matrix(c(100, myr, myr, 50), 2, 2) 
+
+data <- NULL
+sample_size <- 25
+
+set.seed(1234)
+for (i in 2:10) {
+  sample <- data.frame(mvrnorm(sample_size, mu, mysigma))
+  sample$sample <- i
+  data <- rbind(cbind(sample, rcorr(sample$X1, sample$X2)$r[2]), data)
+}
+
+sample <- data.frame(mvrnorm(sample_size, mu, mysigma, empirical = FALSE))
+sample$sample <- 1
+data <- rbind(cbind(sample, rcorr(sample$X1, sample$X2)$r[2]), data)
+
+colnames(data) <- c("Var_1", "Var_2", "Sample", "Correlation")
+data$Correlation <- paste("r = ", round(data$Correlation, 3))
+
+ggplot(data, aes(x = Var_1, y = Var_2)) + 
+  geom_point() +
+  geom_smooth(method = "lm") +
+  facet_wrap(~ Correlation, ncol = 5, nrow = 2) + 
+  labs(title = paste("10 Samples and Pearson's r when sample size = ", sample_size)) + 
+  theme(title = element_text(size = 10)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+]
+
+```{r, eval=FALSE}
+ggplot(data, aes(x = Var_1, y = Var_2)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", se = TRUE) + 
+  transition_time(Sample) + 
+  labs(x = "Variable 1", 
+       y = "Variable 2", 
+       title = "10 samples where each sample size = 500\nSample number: {as.integer(frame_time)}") + 
+  theme(title = element_text(size = 15)) +
+  ease_aes('linear')
+```
+
+---
+# Sample size of 250 when population r = .5
+
+.center[
+```{r, echo=FALSE}
+mu <- c(1000, 2000) 
+myr <- 35.35534
+mysigma <- matrix(c(100, myr, myr, 50), 2, 2) 
+
+data <- NULL
+sample_size <- 250
+
+set.seed(1234)
+for (i in 2:10) {
+  sample <- data.frame(mvrnorm(sample_size, mu, mysigma))
+  sample$sample <- i
+  data <- rbind(cbind(sample, rcorr(sample$X1, sample$X2)$r[2]), data)
+}
+
+sample <- data.frame(mvrnorm(sample_size, mu, mysigma, empirical = FALSE))
+sample$sample <- 1
+data <- rbind(cbind(sample, rcorr(sample$X1, sample$X2)$r[2]), data)
+
+colnames(data) <- c("Var_1", "Var_2", "Sample", "Correlation")
+data$Correlation <- paste("r = ", round(data$Correlation, 3))
+
+ggplot(data, aes(x = Var_1, y = Var_2)) + 
+  geom_point() +
+  geom_smooth(method = "lm") +
+  facet_wrap(~ Correlation, ncol = 5, nrow = 2) + 
+  labs(title = paste("10 Samples and Pearson's r when sample size = ", sample_size)) + 
+  theme(title = element_text(size = 10)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+]
+
+```{r, eval=FALSE}
+ggplot(data, aes(x = Var_1, y = Var_2)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", se = TRUE) + 
+  transition_time(Sample) + 
+  labs(x = "Variable 1", 
+       y = "Variable 2", 
+       title = "10 samples where each sample size = 500\nSample number: {as.integer(frame_time)}") + 
+  theme(title = element_text(size = 15)) +
+  ease_aes('linear')
+```
+
 ---
 class: center, middle
 
+# Hand off to Shiny Widget
 
+https://shiny.rstudio.com/tutorial/written-tutorial/lesson7/
 ---
 # Interested in finding out more?
+
 .pull-left[
-```{r, echo=FALSE, out.width=200}
+```{r, echo=FALSE, out.width=175}
 knitr::include_graphics("r4ds.jpg")
 ```
-]
-.pull-right[
-```{r, echo=FALSE, out.width=250}
-knitr::include_graphics("healy.jpg")
+
+```{r, echo=FALSE, out.width=175}
+knitr::include_graphics("cover.jpg")
 ```
 ]
 
-.pull-left[
-https://r4ds.had.co.nz
+.pull-right[
+```{r, echo=FALSE, out.width=175}
+knitr::include_graphics("healy.jpg")
+```
+
+```{r, echo=FALSE, out.width=175}
+knitr::include_graphics("wilke.png")
+```
+
 ]
-.pull.right[
-https://kieranhealy.org/publications/dataviz/
-]
+
 ---
 # Thanks!
 
@@ -1202,7 +1338,7 @@ class: center
 
 All slides and R code used to generate these slides available here:
 
-XXXXX
+https://github.com/ajstewartlang/ajstewartlang.github.io/tree/master/Lancaster_talk
 
 ```{r, echo=FALSE, out.width="50%"}
 knitr::include_graphics("github.svg")

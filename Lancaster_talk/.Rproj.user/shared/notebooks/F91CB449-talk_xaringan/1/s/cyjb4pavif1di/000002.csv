@@ -1,0 +1,5 @@
+"0","rt <- search_tweets(""Opeth"", n = 1000, include_rts = FALSE, retryonratelimit = TRUE)"
+"0","rt1 <- separate(data = rt, col = created_at, into = c(""date"", ""time""), sep = "" "") "
+"0","rt1 <- rt1[!is.na(rt1$date),]"
+"0","rt1$date <- as.factor(rt1$date)"
+"0","data <- rt1"
