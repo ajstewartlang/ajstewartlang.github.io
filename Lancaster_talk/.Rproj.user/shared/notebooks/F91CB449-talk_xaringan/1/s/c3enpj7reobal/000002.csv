@@ -1,7 +1,0 @@
-"0","set.seed(1234)"
-"0","ID <- rep(seq(1:48), 2)"
-"0","Simple <- as.integer(rnorm(48, mean = 2000, sd = 140))"
-"0","Complex <- as.integer(rnorm(48, mean = 2400, sd = 160))"
-"0","Condition <- c(rep(""Simple"", 48), rep(""Complex"", 48))"
-"0","data_long <- tibble(ID, Condition, c(Simple, Complex))"
-"0","colnames(data_long)[3] <- ""RT"""
