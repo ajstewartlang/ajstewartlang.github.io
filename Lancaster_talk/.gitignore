@@ -1,0 +1,12 @@
+# History files
+.Rhistory
+
+# Session Data files
+.RData
+
+# RStudio files
+.Rproj.user/
+
+# Test scripts
+test.Rmd
+test.html
