@@ -1353,8 +1353,11 @@ You can share this DOI alongside your output - this also allows others to cite y
 dataset if they use it.
 ---
 # Using R Markdown
--
-Using R Markdown you can generate a document that contains narrative, your code AND output, making your analysis transparent and allowing a reader to see both your analysis and output.  
+
+Using R Markdown you can generate a document that contains narrative, your code AND output, making your analysis transparent and allowing a reader to see your analysis, output, and text explaining what you did (and why).  
+
+You can use your R Markdown script to produce HTML, Pord , or PDFdocuments.  HTML drendered documents evenallow you to embed
+ nimated graphs.
 
 ---
 # Example R Markdown Document
