@@ -64,7 +64,7 @@ You really should read this book!
 
 .pull-left[
 ```{r, echo=FALSE, out.width="80%"}
-knitr::include_graphics("deadly.jpg")
+knitr::include_graphics("images/deadly.jpg")
 ```
 ]
 
@@ -73,7 +73,7 @@ knitr::include_graphics("deadly.jpg")
 
 ---
 ```{r, echo=FALSE, out.width="80%"}
-knitr::include_graphics("Gelman.jpg")
+knitr::include_graphics("images/Gelman.jpg")
 ```
 
 http://www.stat.columbia.edu/~gelman/
@@ -111,21 +111,21 @@ R can take you anywhere you want to go if you take time to learn how to use the 
 # In meme form…
 
 ```{r, echo=FALSE}
-knitr::include_graphics("meme.png")
+knitr::include_graphics("images/meme.png")
 ```
 ---
 # A workflow for reproducible science in the Tidyverse
 
 .center[
 ```{r, echo=FALSE, out.width="90%"}
-knitr::include_graphics("tidyverse.png")
+knitr::include_graphics("images/tidyverse.png")
 ```
 ]
 ---
 # A workflow for reproducible science in the Tidyverse
 
 ```{r, echo=FALSE}
-knitr::include_graphics("tidyflow.png")
+knitr::include_graphics("images/tidyflow.png")
 ```
 
 
@@ -474,8 +474,6 @@ ggplotly(p, width = 800, height = 400)
 
 ---
 # Raincloud Plots
-You might have noticed the violin plots have a little redundant information - the shape of the distribution is plotted, but it's also mirrored (which we don't really need). https://peerj.com/preprints/27137v1/
-<p>
 ```{r, echo=FALSE, fig.height=5, fig.width=7}
 source("https://gist.githubusercontent.com/ajstewartlang/6c4cd8ab9e0c27747424acdfb3b4cff6/raw/fb53bd97121f7f9ce947837ef1a4c65a73bffb3f/geom_flat_violin.R")
 
@@ -526,6 +524,10 @@ ggplot(data_long, aes(y = RT, x = Condition, fill = Condition)) +
   scale_y_continuous(breaks = seq(1500,3000,by = 200))
 ```
 
+.footnote[Allen M, Poggiali D, Whitaker K et al. Raincloud plots: a multi-platform tool for robust data visualization [version 1; peer review: 2 approved]. Wellcome Open Res 2019, 4:63
+https://doi.org/10.12688/wellcomeopenres.15191.1
+]
+
 ---
 # Using Different Themes
 
@@ -557,7 +559,7 @@ data_long %>%
 
 ---
 class: center, middle
-```{r, echo=FALSE}
+```{r, echo=FALSE, fig.width=9}
 set.seed(1234)
 ID <- rep(seq(1:48), 2)
 Simple <- as.integer(rnorm(48, mean = 2000, sd = 140))
@@ -582,7 +584,7 @@ data_long %>%
 ---
 class: center, middle
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, fig.width=9}
 data_long %>%
   ggplot(aes(x = Condition, y = RT, colour = Condition)) +
   geom_violin(alpha = .2) +
@@ -597,7 +599,7 @@ data_long %>%
 ---
 class: center, middle
 
-```{r, echo=FALSE, fig.retina=2}
+```{r, echo=FALSE, fig.width=9}
 
 data_long %>%
   ggplot(aes(x = Condition, y = RT, colour = Condition)) +
@@ -614,7 +616,7 @@ data_long %>%
 ---
 class: center, middle
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, fig.width=9}
 data_long %>%
   ggplot(aes(x = Condition, y = RT, colour = Condition)) +
   geom_violin(alpha = .2) +
@@ -633,26 +635,9 @@ The BBC (like many other organisations such as the FT) use R and ggplot to gener
 https://bbc.github.io/rcookbook/
 .center[
 ```{r, echo=FALSE, out.width="80%"}
-knitr::include_graphics("bbc.png")
+knitr::include_graphics("images/bbc.png")
 ```
 ]
----
-
-class: middle, center
-
-# Add the layer bbc_style() at the end of your ggplot() code
-
-```{r, echo=FALSE, fig.height=5}
-data_long %>%
-  ggplot(aes(x = Condition, y = RT, colour = Condition)) +
-  geom_violin(alpha = .2) +
-  geom_boxplot(alpha = .1, width = .1) +
-  geom_jitter(width = .1, colour = "black", alpha = .5) +
-  coord_flip() +
-  guides(colour = FALSE) +
-  bbc_style() +
-  labs(y = "Reading Time")
-```
 
 ---
 # World Happiness Data
@@ -953,7 +938,7 @@ Scraping Twitter using the rtweet() package for everyone's favourite progressive
 
 <p>
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
-rt <- search_tweets("Opeth", n = 1000, include_rts = FALSE, retryonratelimit = TRUE)
+rt <- search_tweets("Opeth", n = 2000, include_rts = FALSE, retryonratelimit = TRUE)
 rt1 <- separate(data = rt, col = created_at, into = c("date", "time"), sep = " ") 
 rt1 <- rt1[!is.na(rt1$date),]
 rt1$date <- as.factor(rt1$date)
@@ -962,7 +947,7 @@ data <- rt1
 
 .center[
 ```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.height=6, fig.width=8}
-img <- jpeg::readJPEG("opeth.jpg")
+img <- jpeg::readJPEG("images/opeth.jpg")
 g <- rasterGrob(img, interpolate=TRUE) 
 
 ggplot(data, aes (x = date)) + 
@@ -1321,7 +1306,7 @@ recommended for figure preparation (or data analysis)."
 .pull-left[
 .center[
 ```{r, echo=FALSE, out.width=200}
-knitr::include_graphics("wilke.png")
+knitr::include_graphics("images/wilke.png")
 ```
 ]
 ]
@@ -1345,7 +1330,7 @@ However, if you just make your data and code publically available an interested 
 
 .center[
 ```{r, echo=FALSE, out.width=550}
-knitr::include_graphics("zenodo.png")
+knitr::include_graphics("images/zenodo.png")
 ```
 ]
 
@@ -1364,7 +1349,7 @@ animated graphs.
 
 .center[
 ```{r, echo=FALSE, out.width=575}
-knitr::include_graphics("graph1.png")
+knitr::include_graphics("images/graph1.png")
 ```
 ]
 
@@ -1378,7 +1363,7 @@ The Papaja template (https://github.com/crsh) by Frederik Aust allows you to wri
 
 .center[
 ```{r, echo=FALSE, out.width=175}
-knitr::include_graphics("frederik.png")
+knitr::include_graphics("images/frederik.png")
 ```
 ]
 ]
@@ -1392,7 +1377,7 @@ as my slides are rendered.
 
 .center[
 ```{r, echo=FALSE, out.width=175}
-knitr::include_graphics("yihui.png")
+knitr::include_graphics("images/yihui.png")
 ```
 ]
 ]
@@ -1402,36 +1387,39 @@ knitr::include_graphics("yihui.png")
 
 .pull-left[
 ```{r, echo=FALSE, out.width=175}
-knitr::include_graphics("r4ds.jpg")
+knitr::include_graphics("images/r4ds.jpg")
 ```
 
 ```{r, echo=FALSE, out.width=175}
-knitr::include_graphics("cover.jpg")
+knitr::include_graphics("images/cover.jpg")
 ```
 ]
 
 .pull-right[
 ```{r, echo=FALSE, out.width=175}
-knitr::include_graphics("healy.jpg")
+knitr::include_graphics("images/healy.jpg")
 ```
 
 ```{r, echo=FALSE, out.width=175}
-knitr::include_graphics("wilke.png")
+knitr::include_graphics("images/wilke.png")
 ```
 
 ]
-
+---
+```{r, echo=FALSE,}
+knitr::include_graphics("images/tidytuesday.png")
+```
 ---
 # Thanks!
 
 .pull-left[
 ```{r, echo=FALSE, out.height="80%"}
-knitr::include_graphics("ssi.png")
+knitr::include_graphics("images/ssi.png")
 ```
 ]
 .pull-right[
 ```{r, echo=FALSE, out.height="70%"}
-knitr::include_graphics("bsbr.jpg")
+knitr::include_graphics("images/bsbr.jpg")
 ```
 ]
 
@@ -1445,7 +1433,7 @@ All slides and R code used to generate these slides available here:
 https://github.com/ajstewartlang/ajstewartlang.github.io/tree/master/Lancaster_talk
 
 ```{r, echo=FALSE, out.width="50%"}
-knitr::include_graphics("github.svg")
+knitr::include_graphics("images/github.svg")
 ```
 
 .footnote[
