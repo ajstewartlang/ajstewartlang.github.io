@@ -1341,7 +1341,7 @@ dataset if they use it.
 
 Using R Markdown you can generate a document that contains narrative, your code AND output, making your analysis transparent and allowing a reader to see your analysis, output, and text explaining what you did (and why).  
 
-You can use your R Markdown script to produce HTML, Pord , or PDFdocuments.  HTML documents allow you to embed
+You can use your R Markdown script to produce HTML, Word, or PDF documents.  HTML documents allow you to embed
 animated graphs.
 
 ---
