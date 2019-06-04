@@ -1,7 +1,7 @@
 ---
 title: "Reproducible Data Visualisations"
 subtitle: ""
-author: "Andrew Stewart<br>University of Manchester<br><br>Twitter: @ajstewart_lang<br>GitHub: github.com/ajstewartlang"
+author: "Andrew Stewart<br>University of Manchester<br>Division of Neuroscience and Experimental Psychology<br>Software Sustainability Institute Fellow<br>Twitter: @ajstewart_lang<br>GitHub: github.com/ajstewartlang"
 date: "(updated: `r Sys.Date()`)"
 output:
   xaringan::moon_reader:
@@ -273,7 +273,7 @@ grid.arrange(p1, p2, p3, nrow = 1)
 ---
 # The distribution of data matters
 
-The data on the previous slide are clearly bimodal with nodata point near the mean.  Distribution shape matters and we need to capture that in our data visualisations.
+The data on the previous slide are clearly bimodal with no data point near the mean.  Distribution shape matters and we need to capture that in our data visualisations.
 
 If we only plotted and reported information related to aggregated data, we wouldn't be being honest about what our data look like.
 ---
@@ -1318,7 +1318,7 @@ knitr::include_graphics("images/wilke.png")
 ---
 # Using OSF or GitHub
 
-Both the Open Science Foundation (http://sf.io) and GitHub (http://gthub.com) can be used to host your data and 
+Both the Open Science Foundation (https://osf.io) and GitHub (https://github.com) can be used to host your data and 
 analysis code.  If you have pre-registered your study or have gone down the registered report route 
 (where your research is unconditionally accepted for publication before you've started collecting data) 
 then you can link your data and analysis code with the pre-registration itself.
