@@ -1318,7 +1318,7 @@ knitr::include_graphics("images/wilke.png")
 ---
 # Using OSF or GitHub
 
-Both the Open Science Foundation (http://sf.io) and GitHub (http://gthub.com) can be used to host your data and 
+Both the Open Science Foundation (https://osf.io) and GitHub (https://github.com) can be used to host your data and 
 analysis code.  If you have pre-registered your study or have gone down the registered report route 
 (where your research is unconditionally accepted for publication before you've started collecting data) 
 then you can link your data and analysis code with the pre-registration itself.
