@@ -308,6 +308,7 @@ anova(model3, model0)</code></pre>
 <div id="statistical-regression" class="section level1">
 <h1>Statistical Regression</h1>
 <p>We can also do stepwise regression - forwards is when you start with the null model and predictors are added until they don’t explain any more variance, backwards is when you start with the full model and remove predictors until removal starts affecting your model’s predictive ability. Let’s keep case 10 dropped and also drop the high VIF predictor (RA). This is handy for models with lots of predictors where the order in sequential regression is not obvious.</p>
+<p>The <code>step()</code> procedure works by minimising the AIC (Akaike Information Criterion) value.</p>
 <pre class="r"><code>model0 &lt;- lm (corr_spell ~ 1, data = MRes_tut2)
 model1 &lt;- lm (corr_spell ~ age + std_RA + std_SPELL, data = MRes_tut2)</code></pre>
 <p>Let’s do Stepwise forwards:</p>
@@ -449,41 +450,6 @@ model1 &lt;- lm (corr_spell ~ age + std_RA + std_SPELL, data = MRes_tut2)</code>
 ## Multiple R-squared:  0.8388, Adjusted R-squared:  0.8273 
 ## F-statistic: 72.87 on 3 and 42 DF,  p-value: &lt; 2.2e-16</code></pre>
 <p>You’ll see that the same final model is arrived it in each case. We have three significant predictors.</p>
-<p>We can also use the stepAIC function - it will produce the same result as using the step function (as the step function bases model selection on AIC rather than F-ratio improvement). Step is actually a slightly simplified version of the stepAIC function.</p>
-<pre class="r"><code>stepAICmodel &lt;- stepAIC(model1, scope = model1, scale = 0,
-        direction = &quot;both&quot;,
-        trace = 1, keep = NULL, steps = 1000,
-        k = 2)</code></pre>
-<pre><code>## Start:  AIC=214.02
-## corr_spell ~ age + std_RA + std_SPELL
-## 
-##             Df Sum of Sq    RSS    AIC
-## &lt;none&gt;                   4053.5 214.02
-## - std_RA     1     728.1 4781.6 219.62
-## - age        1    2581.2 6634.7 234.69
-## - std_SPELL  1    5198.3 9251.8 249.98</code></pre>
-<pre class="r"><code>summary(stepAICmodel)</code></pre>
-<pre><code>## 
-## Call:
-## lm(formula = corr_spell ~ age + std_RA + std_SPELL, data = MRes_tut2)
-## 
-## Residuals:
-##     Min      1Q  Median      3Q     Max 
-## -19.801  -6.907   1.327   5.155  24.669 
-## 
-## Coefficients:
-##              Estimate Std. Error t value Pr(&gt;|t|)    
-## (Intercept) -209.4400    26.7210  -7.838 9.43e-10 ***
-## age            1.1033     0.2133   5.172 6.09e-06 ***
-## std_RA         0.3804     0.1385   2.747  0.00883 ** 
-## std_SPELL      1.2107     0.1650   7.339 4.78e-09 ***
-## ---
-## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-## 
-## Residual standard error: 9.824 on 42 degrees of freedom
-## Multiple R-squared:  0.8388, Adjusted R-squared:  0.8273 
-## F-statistic: 72.87 on 3 and 42 DF,  p-value: &lt; 2.2e-16</code></pre>
-<p>In this case, the model with the lowest AIC value is also the one arrived at statisically via the sequential procedure - but this may not always be the case.</p>
 </div>
 
 
