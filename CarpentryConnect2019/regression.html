@@ -207,6 +207,7 @@ library(Hmisc) # Needed for correlation
 library(MASS) # Needed for maths functions
 library(car) # Needed for VIF calculation</code></pre>
 <p>Let’s read in the data.</p>
+<pre class="r"><code>MRes_tut2 &lt;- read_csv(&quot;https://raw.githubusercontent.com/ajstewartlang/Psychology_MRes_Stats_R_Course/master/Lecture%205/MRes_tut2.csv&quot;)</code></pre>
 <p>Before we start, let’s look at the relationships between our IVs (predictors) and our DV (outcome). We can plot graphs depicting the correlations. We’ll plot test performance against each of our four predictors in turn:</p>
 <pre class="r"><code>ggplot(MRes_tut2, aes (x = MRes_tut2$age, y = MRes_tut2$corr_spell)) + 
   geom_point() + 
