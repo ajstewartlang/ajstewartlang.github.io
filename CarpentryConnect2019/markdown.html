@@ -205,7 +205,7 @@ library(emmeans)</code></pre>
 <p>Let’s imagine we have data from two different groups measuring reaction time (our dependent variable). Group A performed the task under Condition A, Group B under Condition B.</p>
 <p>Group A are from a population with a mean = 1000, sd = 20 while Group B are from a population with a mean = 1010, sd = 20</p>
 <p>The difference we are investigating equates to a Cohen’s d of .5 as (1010-1000)/20 = .5. This is known as a medium effect size.</p>
-<p>First let’s plot an approximation of the population for each sample. Let’s sample 1000 people from each group. Always remember to <code>set.seed()</code> to ensure things are reproducible.</p>
+<p>First let’s plot an approximation of the population for each sample. Let’s sample 10,000 people from each group. Always remember to <code>set.seed()</code> to ensure things are reproducible.</p>
 <pre class="r"><code>set.seed(1234)
 DV &lt;- c(rnorm(10000, 1000, 20), rnorm(10000, 1010, 20))
 condition &lt;- c(rep(&quot;Condition_A&quot;, 10000), rep(&quot;Condition_B&quot;, 10000))
