@@ -14,6 +14,8 @@ http://ajstewartlang.github.io/Hackathon/index
 
 http://ajstewartlang.github.io/Binder_slides.pdf
 
+http://ajstewartlang.github.io/R_Binder_quick_guide.pdf
+
 http://ajstewartlang.github.io/Lancaster_talk/talk_xaringan
 
 http://ajstewartlang.github.io/talks/Keele_Staffs_talk.pdf
