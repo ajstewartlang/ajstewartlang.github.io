@@ -5,15 +5,6 @@
     <meta charset="utf-8" />
     <link href="libs/remark-css/default.css" rel="stylesheet" />
     <link href="libs/remark-css/default-fonts.css" rel="stylesheet" />
-    <script src="libs/htmlwidgets/htmlwidgets.js"></script>
-    <script src="libs/jquery/jquery.min.js"></script>
-    <link href="libs/leaflet/leaflet.css" rel="stylesheet" />
-    <script src="libs/leaflet/leaflet.js"></script>
-    <link href="libs/leafletfix/leafletfix.css" rel="stylesheet" />
-    <script src="libs/Proj4Leaflet/proj4-compressed.js"></script>
-    <script src="libs/Proj4Leaflet/proj4leaflet.js"></script>
-    <link href="libs/rstudio_leaflet/rstudio_leaflet.css" rel="stylesheet" />
-    <script src="libs/leaflet-binding/leaflet.js"></script>
   </head>
   <body>
     <textarea id="source">
@@ -24,7 +15,7 @@ class: center, middle, title-slide
 Andrew Stewart<br>University of Manchester<br>Twitter: <span class="citation">@ajstewart_lang</span>
 </p>
 <p>Oli Clark<br>Manchester Metropolitan University<br>Twitter: <span class="citation">@psytecholi</span></p>
-### (updated: 2019-07-07)
+### (updated: 2019-07-04)
 
 ---
 
@@ -582,101 +573,6 @@ happy_data %&gt;%
 ```
 ]
 ---
-# Visualising Data from Twitter
-
-Scraping Twitter using the rtweet() package for everyone's favourite progressive 
-Swedish death metal band, Opeth! 🤘  
-
-&lt;p&gt;
-
-
-.center[
-![](SIPS_presentation_files/figure-html/unnamed-chunk-58-1.png)&lt;!-- --&gt;
-]
----
-class: centre
-
-# Geospatial Plotting of Tweets
-
-
-
-.center[
-<div id="htmlwidget-af31fcf2b1bdbba72aec" style="width:576px;height:432px;" class="leaflet html-widget"></div>
-<script type="application/json" data-for="htmlwidget-af31fcf2b1bdbba72aec">{"x":{"options":{"crs":{"crsClass":"L.CRS.EPSG3857","code":null,"proj4def":null,"projectedBounds":null,"options":{}}},"calls":[{"method":"addTiles","args":["//{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",null,null,{"minZoom":0,"maxZoom":18,"tileSize":256,"subdomains":"abc","errorTileUrl":"","tms":false,"noWrap":false,"zoomOffset":0,"zoomReverse":false,"opacity":1,"zIndex":1,"detectRetina":false,"attribution":"&copy; <a href=\"http://openstreetmap.org\">OpenStreetMap<\/a> contributors, <a href=\"http://creativecommons.org/licenses/by-sa/2.0/\">CC-BY-SA<\/a>"}]},{"method":"addCircles","args":[[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,-37.97256651425,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,41.12715476,null,null,null,null,null,null,null,41.0213205,41.0213205,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,41.0213205,null,null,41.12692018,null,null,null,null,null,null,null,null,null,null,null,null,null,41.0213205,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,-2.6292855,null,-2.6292855,null,-2.6292855,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,20.7906572,null,null,null,null,null,null,null,null,null,null,-23.7107695,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,28.368525,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,19.28432165,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,29.59624885,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,30.361857,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,51.316522,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,41.7337898,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,38.4079305,null,null,null,null,null,null,null,null,null,null,null,null,null,19.518656,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,39.8618361,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,43.8806945,43.8806945,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,52.76132755,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,37.2376652,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,-22.5243471,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,60.18646976,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,41.0262045,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,60.18656639,null,null,null,null,null,null,null,null,null,null,null,null,null,null,59.9724055,null,null,57.59916175,null,null,null,null,null,null,41.6135944,null,null,null,40.95437685,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,37.7706565,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,-25.3002637,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,10.3665905,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,145.053135344,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,29.02133659,null,null,null,null,null,null,null,29.0052228,29.0052228,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,29.0052228,null,null,29.02145863,null,null,null,null,null,null,null,null,null,null,null,null,null,29.0052228,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,-44.3025505,null,-44.3025505,null,-44.3025505,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,-103.4847745,null,null,null,null,null,null,null,null,null,null,-46.422691,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,76.974691,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,-99.655676,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,31.57060625,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,-87.161081,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,-0.54883575,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,27.21516645,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,27.00651085,null,null,null,null,null,null,null,null,null,null,null,null,null,-99.1158907,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,32.84532615,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,-79.2996725,-79.2996725,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,0.419867,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,-6.91868315,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,-44.080922,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,24.97180673,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,-73.754737,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,24.97338295,null,null,null,null,null,null,null,null,null,null,null,null,null,null,10.7215259,null,null,-4.43519605,null,null,null,null,null,null,21.743291,null,null,null,-5.67914705,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,-122.4359785,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,-57.60601775,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,-83.9519653,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],40,null,null,{"interactive":true,"className":"","stroke":true,"color":"#fb3004","weight":8,"opacity":0.5,"fill":true,"fillColor":"#fb3004","fillOpacity":0.8},null,null,null,{"interactive":false,"permanent":false,"direction":"auto","opacity":1,"offset":[0,0],"textsize":"10px","textOnly":false,"className":"","sticky":true},null,null]}],"limits":{"lat":[-37.97256651425,60.18656639],"lng":[-122.4359785,145.053135344]}},"evals":[],"jsHooks":[]}</script>
-]
-
----
-class: middle, center
-# Teaching with Animations
-
----
-# Data Simulations and Data Visualisation - Hockey Game Simulation
-
-Imagine a hockey game where we know that Team A scores exactly 1 goal for sure and Team B takes 20 shots, each with a 5.5% chance of going in.
-
-Which team would you rather be?
-
-(nothing additional happens if you tie.)
-
-
-```r
-set.seed(1234)
-
-team_b_goals &lt;- NULL
-
-for(i in 1:10000) {
-score &lt;- sum(sample(c(1, 0), size = 20, replace = TRUE, 
-                    prob = c(0.055, 1-.055)))
-team_b_goals &lt;- c(team_b_goals, score)}
-
-team_a_goals &lt;- rep(1, 10000)
-
-all_games &lt;- as_tibble(cbind(team_a_goals, team_b_goals))
-```
-
----
-
-
-
-```
-## [1] "Games where Team A scores more goals than Team B:  3145"
-```
-
-```
-## [1] "Games where Team A scores fewer goals than Team B:  3050"
-```
-
-```
-## [1] "Games where there is a tie :  3805"
-```
-
-.center[
-![](SIPS_presentation_files/figure-html/unnamed-chunk-64-1.gif)&lt;!-- --&gt;
-]
----
-class: middle, center
-
-![](SIPS_presentation_files/figure-html/unnamed-chunk-65-1.gif)&lt;!-- --&gt;
-
----
-# Sample size of 25 when population r = .5
-
-.center[
-
-
-![](SIPS_presentation_files/figure-html/unnamed-chunk-67-1.gif)&lt;!-- --&gt;
-]
-
----
-# Sample size of 250 when population r = .5
-
-.center[
-
-
-![](SIPS_presentation_files/figure-html/unnamed-chunk-69-1.gif)&lt;!-- --&gt;
-]
-
----
 # Binder for fully reproducible computational environments
 
 On the previous slides, we saw a number of example visualizations and 
@@ -852,14 +748,14 @@ repositories, and a Binder associated with each of the 6 repositories.
 
 .middle[
 .center[
-![](SIPS_presentation_files/figure-html/unnamed-chunk-85-1.png)&lt;!-- --&gt;
+![](SIPS_presentation_files/figure-html/unnamed-chunk-72-1.png)&lt;!-- --&gt;
 ]
 ]
 ---
 # Visualization 2
 .middle[
 .center[
-![](SIPS_presentation_files/figure-html/unnamed-chunk-86-1.png)&lt;!-- --&gt;
+![](SIPS_presentation_files/figure-html/unnamed-chunk-73-1.png)&lt;!-- --&gt;
 ]
 ]
 ---
@@ -867,7 +763,7 @@ repositories, and a Binder associated with each of the 6 repositories.
 
 .middle[
 .center[
-![](SIPS_presentation_files/figure-html/unnamed-chunk-87-1.png)&lt;!-- --&gt;
+![](SIPS_presentation_files/figure-html/unnamed-chunk-74-1.png)&lt;!-- --&gt;
 ]
 ]
 ---
@@ -875,7 +771,7 @@ repositories, and a Binder associated with each of the 6 repositories.
 
 .middle[
 .center[
-![](SIPS_presentation_files/figure-html/unnamed-chunk-88-1.png)&lt;!-- --&gt;
+![](SIPS_presentation_files/figure-html/unnamed-chunk-75-1.png)&lt;!-- --&gt;
 ]
 ]
 ---
@@ -883,7 +779,7 @@ repositories, and a Binder associated with each of the 6 repositories.
 
 .middle[
 .center[
-![](SIPS_presentation_files/figure-html/unnamed-chunk-89-1.png)&lt;!-- --&gt;
+![](SIPS_presentation_files/figure-html/unnamed-chunk-76-1.png)&lt;!-- --&gt;
 ]
 ]
 ---
@@ -891,7 +787,7 @@ repositories, and a Binder associated with each of the 6 repositories.
 
 .middle[
 .center[
-![](SIPS_presentation_files/figure-html/unnamed-chunk-90-1.gif)&lt;!-- --&gt;
+![](SIPS_presentation_files/figure-html/unnamed-chunk-77-1.gif)&lt;!-- --&gt;
 ]
 ]
 ---
