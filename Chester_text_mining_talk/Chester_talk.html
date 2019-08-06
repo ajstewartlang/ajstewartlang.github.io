@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+  <head>
+    <title>Text Mining in R</title>
+    <meta charset="utf-8" />
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/default-fonts.css" rel="stylesheet" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, title-slide
+
+# Text Mining in R
+### </p>
+<p>Andrew Stewart<br>University of Manchester<br>Twitter: <span class="citation">@ajstewart_lang</span></p>
+### (updated: 2019-08-06)
+
+---
+
+
+
+
+
+# Text Mining
+
+There's a great book on text mining by Julia Silge and David Robinson all
+written to work with data in Tidy format.
+
+.pull-left[
+&lt;img src="images/text_mining.png" width="261" height="25%" /&gt;
+]
+
+.pull-right[
+&lt;img src="images/julia.png" width="180" height="180" /&gt;&lt;img src="images/david.png" width="180" height="180" /&gt;
+]
+---
+# What we'll cover today...
+
+Summarising text data.
+
+Sentiment analysis.
+
+Extracting frequency information (and demonstrating Zipf's law).
+
+Characterising text that plays a unique contribution in two different corpora.
+
+N-gram analysis.
+
+Scraping Twitter and visualising Twitter data.
+
+---
+# Downloading some text data
+
+We are going to download from Project Gutenberg the text of four books by 
+HG Wells. We will combine these four books into a dataframe called 'books'.
+
+```r
+titles &lt;- c("The War of the Worlds",
+            "The Time Machine",
+            "Twenty Thousand Leagues under the Sea", 
+            "The Invisible Man: A Grotesque Romance")
+
+books &lt;- gutenberg_works(title %in% titles) %&gt;%
+  gutenberg_download(meta_fields = "title")
+```
+---
+# Visualising the dataframe
+
+```r
+vis_dat(books)
+```
+
+.center[
+![](Chester_talk_files/figure-html/unnamed-chunk-6-1.png)&lt;!-- --&gt;
+]
+---
+
+```r
+books$text
+```
+
+&lt;img src="images/text.png" width="729" /&gt;
+---
+Currently the text is all in one column in our dataframe - we need to transform 
+it into tidy format such that one word appears in each row. We do this by 
+'unnesting' the text column and removing 'stop words'. These are common words
+(e.g., function words like 'the' and 'of').
+
+
+```r
+all_text &lt;- books %&gt;%
+  unnest_tokens(word, text) %&gt;%
+  anti_join(stop_words) 
+```
+
+```
+## Joining, by = "word"
+```
+
+```r
+head(all_text)
+```
+
+```
+## # A tibble: 6 x 3
+##   gutenberg_id title            word      
+##          &lt;int&gt; &lt;chr&gt;            &lt;chr&gt;     
+## 1           35 The Time Machine time      
+## 2           35 The Time Machine machine   
+## 3           35 The Time Machine 1898      
+## 4           35 The Time Machine time      
+## 5           35 The Time Machine traveller 
+## 6           35 The Time Machine convenient
+```
+
+---
+# Summary Data of the Corpus
+
+
+```r
+all_text %&gt;%
+  group_by(title, word) %&gt;%
+  count(sort = TRUE) %&gt;%
+  ungroup() %&gt;%
+  top_n(8)
+```
+
+```
+## Selecting by n
+```
+
+```
+## # A tibble: 8 x 3
+##   title                                 word         n
+##   &lt;chr&gt;                                 &lt;chr&gt;    &lt;int&gt;
+## 1 Twenty Thousand Leagues under the Sea captain    607
+## 2 Twenty Thousand Leagues under the Sea nautilus   520
+## 3 Twenty Thousand Leagues under the Sea sea        349
+## 4 Twenty Thousand Leagues under the Sea nemo       347
+## 5 Twenty Thousand Leagues under the Sea ned        320
+## 6 Twenty Thousand Leagues under the Sea conseil    271
+## 7 Twenty Thousand Leagues under the Sea land       240
+## 8 Twenty Thousand Leagues under the Sea water      236
+```
+---
+# Summary Data of War of the Worlds
+
+
+```r
+all_text %&gt;%
+  filter(title == "The War of the Worlds") %&gt;%
+  group_by(word) %&gt;%
+  tally(sort = TRUE) %&gt;%
+  top_n(10)
+```
+
+```
+## # A tibble: 10 x 2
+##    word         n
+##    &lt;chr&gt;    &lt;int&gt;
+##  1 martians   163
+##  2 people     159
+##  3 black      122
+##  4 time       121
+##  5 road       104
+##  6 night      102
+##  7 brother     91
+##  8 pit         83
+##  9 martian     79
+## 10 water       79
+```
+---
+class: center, middle
+&lt;img src="Chester_talk_files/figure-html/unnamed-chunk-12-1.png" width="720" /&gt;
+
+---
+# Sentiment Analysis 
+
+We can use one of the sentiment databases built-in to the tidytext package. The 
+'bing' database has sentiment ratings (positive vs. negative) for almost 7,000 
+words.
+
+
+```r
+get_sentiments("bing")
+```
+
+```
+## # A tibble: 6,786 x 2
+##    word        sentiment
+##    &lt;chr&gt;       &lt;chr&gt;    
+##  1 2-faces     negative 
+##  2 abnormal    negative 
+##  3 abolish     negative 
+##  4 abominable  negative 
+##  5 abominably  negative 
+##  6 abominate   negative 
+##  7 abomination negative 
+##  8 abort       negative 
+##  9 aborted     negative 
+## 10 aborts      negative 
+## # … with 6,776 more rows
+```
+---
+We can 'join' our books dataframe to this database using the inner_join() 
+function from the dplyr package.
+
+
+```r
+all_text_sent &lt;- all_text %&gt;%
+  inner_join(get_sentiments("bing")) 
+```
+
+```
+## Joining, by = "word"
+```
+
+```r
+head(all_text_sent)
+```
+
+```
+## # A tibble: 6 x 4
+##   gutenberg_id title            word       sentiment
+##          &lt;int&gt; &lt;chr&gt;            &lt;chr&gt;      &lt;chr&gt;    
+## 1           35 The Time Machine convenient positive 
+## 2           35 The Time Machine pale       negative 
+## 3           35 The Time Machine burned     negative 
+## 4           35 The Time Machine soft       positive 
+## 5           35 The Time Machine radiance   positive 
+## 6           35 The Time Machine luxurious  positive
+```
+---
+
+```r
+all_text_sent %&gt;%
+  filter(title == "The War of the Worlds") %&gt;%
+  count(word, sentiment, sort = TRUE) %&gt;%
+  top_n(25) %&gt;%
+  mutate(n = ifelse(sentiment == "negative", -n, n)) %&gt;%
+  mutate(word = reorder(word, n)) %&gt;%
+  ggplot(aes(x = word, y = n, fill = sentiment)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Sentiment Analysis of Top 25 Words in
+       The War of the Worlds", 
+       x = "Word",
+       y = "Count") +
+  theme(text = element_text(size = 20))
+```
+---
+&lt;img src="Chester_talk_files/figure-html/unnamed-chunk-16-1.png" width="720" /&gt;
+---
+# Examining proprtion of usage of each word
+
+
+```r
+book_words &lt;- all_text %&gt;% 
+  group_by(title) %&gt;% 
+  count(title, word, sort = TRUE)
+
+total_words &lt;- book_words %&gt;% 
+  group_by(title) %&gt;% 
+  summarise(total = sum(n))
+
+book_words &lt;- left_join(book_words, total_words)
+```
+
+```
+## Joining, by = "title"
+```
+---
+
+
+```r
+book_words %&gt;%
+  mutate(proportion = n/total) %&gt;%
+  group_by(title) %&gt;%
+  arrange(desc(proportion)) %&gt;%
+  top_n(3) %&gt;%
+  select(-n, -total)
+```
+
+```
+## Selecting by proportion
+```
+
+```
+## # A tibble: 12 x 3
+## # Groups:   title [4]
+##    title                                  word      proportion
+##    &lt;chr&gt;                                  &lt;chr&gt;          &lt;dbl&gt;
+##  1 The Time Machine                       time         0.0180 
+##  2 Twenty Thousand Leagues under the Sea  captain      0.0153 
+##  3 Twenty Thousand Leagues under the Sea  nautilus     0.0131 
+##  4 The Invisible Man: A Grotesque Romance kemp         0.0121 
+##  5 The Invisible Man: A Grotesque Romance invisible    0.0102 
+##  6 The Invisible Man: A Grotesque Romance door         0.00961
+##  7 Twenty Thousand Leagues under the Sea  sea          0.00880
+##  8 The Time Machine                       machine      0.00765
+##  9 The War of the Worlds                  martians     0.00722
+## 10 The War of the Worlds                  people       0.00704
+## 11 The War of the Worlds                  black        0.00540
+## 12 The Time Machine                       white        0.00531
+```
+---
+# Visualizing the data - Zipf's Law
+
+![](Chester_talk_files/figure-html/unnamed-chunk-19-1.png)&lt;!-- --&gt;
+---
+# Which words are most important (and unique) to each book?
+
+The bind_tf_idf() function works out the important words for each book by adding 
+a weighting to each word - decreasing the weight for commonly used words and 
+increasing the weight for words not used much in the overall corpus.
+
+This allows us to identify what words tend to be uniquely associated with each
+of the four books.
+
+
+```r
+book_words &lt;- book_words %&gt;%
+  bind_tf_idf(word, title, n)
+```
+
+---
+
+```r
+book_words %&gt;%
+  group_by(title) %&gt;%
+  top_n(15) %&gt;%
+  ungroup %&gt;%
+  ggplot(aes(x = reorder(word, tf_idf), y = tf_idf, fill = title)) +
+  geom_col(show.legend = FALSE) +
+  labs(x = NULL, y = "tf_idf") +
+  facet_wrap(~title, ncol = 2, scales = "free") +
+  coord_flip() +
+  theme(text = element_text(size = 20))
+```
+---
+![](Chester_talk_files/figure-html/unnamed-chunk-22-1.png)&lt;!-- --&gt;
+---
+# N-gram tokenizing
+
+So far we've unnested such that each word is separate. But we can also unnest
+by n-grams to capture sequences of words. In this example, let's look at 
+tokenizing by bigram.
+
+
+```r
+wells_bigrams &lt;- books %&gt;% 
+  filter(title == "The War of the Worlds") %&gt;%
+  unnest_tokens(bigram, text, token = "ngrams", n = 2)
+
+bigrams_separated &lt;- wells_bigrams %&gt;%
+  separate(bigram, c("word1", "word2", sep = " "))
+
+bigrams_filtered &lt;- bigrams_separated %&gt;%
+  filter(!word1 %in% stop_words$word) %&gt;%
+  filter(!word2 %in% stop_words$word)
+
+bigrams_counts &lt;- bigrams_filtered %&gt;%
+  count(word1, word2, sort = TRUE)
+```
+---
+# Top bigrams in War of the Worlds
+
+```
+## Selecting by n
+```
+
+```
+## # A tibble: 12 x 3
+##    word1    word2        n
+##    &lt;chr&gt;    &lt;chr&gt;    &lt;int&gt;
+##  1 heat     ray         35
+##  2 red      weed        26
+##  3 black    smoke       25
+##  4 ulla     ulla        21
+##  5 handling machine     15
+##  6 sand     pits        14
+##  7 pine     trees       12
+##  8 fighting machine     10
+##  9 hundred  yards       10
+## 10 fighting machines     9
+## 11 pine     woods        9
+## 12 woking   station      9
+```
+---
+# War of the Worlds bigram network graph
+![](Chester_talk_files/figure-html/unnamed-chunk-25-1.png)&lt;!-- --&gt;
+
+---
+# Scraping Twitter
+The package `rtweet()` by Mike Kearney allows us to scrape Twitter for data. 
+First you need to set up a Twitter API access token.
+Full instructions are provide in one of the rtweet vignettes - there are two
+methods with the "2. Access token/secret method" the more straightforward:
+
+
+```r
+vignette("auth")
+```
+
+&lt;img src="images/auth.png" width="85%" /&gt;
+---
+# Visualising Data from Twitter
+
+Scraping Twitter using the rtweet() package for everyone's favourite progressive 
+Swedish death metal band, Opeth! 🤘  
+
+
+```r
+library(rtweet)
+```
+
+The code below uses the search_tweets() function from the rtweet package. The
+first parameter is the query to be searched for, n is the number of tweets
+to return. By setting include_rts to FALSE we are ignoring re-tweets that 
+mention "Opeth". retryonratelimit means that if we get timed out by the Twitter
+API, the code will pause until the limit resets.
+
+
+```r
+tweets &lt;- search_tweets(q = "Opeth", n = 2000, 
+                        include_rts = FALSE, 
+                        retryonratelimit = TRUE) 
+```
+
+---
+
+Let's tidy the dataframe to separate out the data and time of each tweet, plus
+select only a small number of columns we're interested in.
+
+
+```r
+tweets &lt;- tweets %&gt;% 
+  separate(col = created_at, into = c("date", "time"), 
+           sep = " ") %&gt;%
+  select(screen_name, date, time, text, 
+         coords_coords, bbox_coords, geo_coords)
+```
+
+---
+The Tweets dataframe looks like this:
+.center[
+
+```r
+vis_dat(tweets)
+```
+
+![](Chester_talk_files/figure-html/unnamed-chunk-31-1.png)&lt;!-- --&gt;
+]
+---
+![](Chester_talk_files/figure-html/unnamed-chunk-32-1.png)&lt;!-- --&gt;
+
+---
+# Scraping Individual Timelines
+
+Let's get the last 1,000 Tweets by the authors Stephen King and Neil Gaiman.
+
+
+```r
+timeline_tweets &lt;- 
+  get_timeline(user = c("neilhimself", "StephenKing"), 
+                n = 1000, max_id = NULL, home = FALSE, 
+                parse = TRUE, check = TRUE)
+```
+
+---
+# Top 20 words in each author's Tweets
+![](Chester_talk_files/figure-html/unnamed-chunk-34-1.png)&lt;!-- --&gt;
+
+---
+# Which words characterise Neil Gaiman's vs. Stephen King's Tweets?
+
+![](Chester_talk_files/figure-html/unnamed-chunk-35-1.png)&lt;!-- --&gt;
+
+---
+# At what time do the authors Tweet?
+
+![](Chester_talk_files/figure-html/unnamed-chunk-36-1.png)&lt;!-- --&gt;
+
+---
+# Neil Gaiman's Tweets by source
+
+![](Chester_talk_files/figure-html/unnamed-chunk-37-1.png)&lt;!-- --&gt;
+
+---
+# That was a fully reproducible talk (just add my accent)
+
+All slides and R code used to generate these slides available 
+[here](https://github.com/ajstewartlang/Chester_text_mining_R)
+
+&lt;br /&gt;
+
+&lt;img src="images/ssi.png" width="1575" height="50%" /&gt;
+
+&lt;br /&gt;
+
+Slides created via the R package [**xaringan**](https://github.com/yihui/xaringan), [**knitr**](http://yihui.name/knitr), and [R Markdown](https://rmarkdown.rstudio.com).
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();</script>
+
+<script>
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
