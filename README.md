@@ -25,5 +25,7 @@ http://ajstewartlang.github.io/Lancaster_talk/talk_xaringan
 
 http://ajstewartlang.github.io/talks/Keele_Staffs_talk.pdf
 
+http://ajstewartlang.github.io/talks/linguistics_talk.pdf
+
 http://ajstewartlang.github.io/Chester_text_mining_talk/Chester_talk.html
 
