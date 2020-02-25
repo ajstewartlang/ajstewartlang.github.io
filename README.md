@@ -27,5 +27,7 @@ http://ajstewartlang.github.io/talks/Keele_Staffs_talk.pdf
 
 http://ajstewartlang.github.io/talks/linguistics_talk.pdf
 
+https://ajstewartlang.github.io/talks/OLS_talk/index.html
+
 http://ajstewartlang.github.io/Chester_text_mining_talk/Chester_talk.html
 
