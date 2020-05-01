@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Overview - Open Research
 
-<iframe width="560" height="315" src="https://youtube.com/embed/XKoBXyjenJk" frameborder="0" allowfullscreen></iframe>
+<iframe width="560" height="315" src="https://youtube.com/embed/E1Sd_GEYLoQ" frameborder="0" allowfullscreen></iframe>
 
 ## Starting a new project
 
